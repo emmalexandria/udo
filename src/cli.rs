@@ -9,23 +9,27 @@ pub fn get_cli() -> Command {
                 .help("The command to run")
                 .trailing_var_arg(true)
                 .num_args(0..)
-                .required_unless_present("shell"),
+                .required_unless_present_any(["shell", "interactive", "clear"]),
         )
         .arg(
             Arg::new("shell")
-                .help("Enter an elevated shell")
                 .short('s')
                 .long("shell")
                 .action(ArgAction::SetTrue)
-                .conflicts_with("command"),
+                .help("Enter an elevated shell"),
         )
-        .subcommand(
-            command!("check")
-                .about("Check if a given file is a valid udo configuration")
-                .arg(
-                    Arg::new("path")
-                        .value_parser(value_parser!(PathBuf))
-                        .num_args(1),
-                ),
+        .arg(
+            Arg::new("interactive")
+                .short('i')
+                .long("interactive")
+                .action(ArgAction::SetTrue)
+                .help("Simulate a full root login"),
+        )
+        .arg(
+            Arg::new("clear")
+                .short('c')
+                .long("clear")
+                .action(ArgAction::SetTrue)
+                .help("Clear the login cache"),
         )
 }

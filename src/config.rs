@@ -24,6 +24,26 @@ impl Rule {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SecurityConfig {
+    #[serde(default)]
+    pub timeout: i64,
+    #[serde(default)]
+    pub lockout: i64,
+    #[serde(default)]
+    pub tries: usize,
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            timeout: 10,
+            lockout: 5,
+            tries: 3,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct DisplayConfig {
     #[serde(default)]
@@ -53,6 +73,8 @@ pub struct Config {
     pub display: DisplayConfig,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    #[serde(default)]
+    pub security: SecurityConfig,
 }
 
 impl Default for Config {
@@ -60,6 +82,7 @@ impl Default for Config {
         Self {
             display: DisplayConfig::default(),
             rules: vec![],
+            security: SecurityConfig::default(),
         }
     }
 }

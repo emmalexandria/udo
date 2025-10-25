@@ -29,7 +29,8 @@ pub fn authenticate(password: String, config: &Config) -> Result<AuthResult> {
         return Ok(AuthResult::NotAuthorised);
     }
 
-    if !authenticate_user(&user.name, &password, "UDO").unwrap() {
+    let auth = authenticate_user(&user.name, &password, "udo");
+    if auth.is_err() || auth.is_ok_and(|v| !v) {
         return Ok(AuthResult::AuthenticationFailure);
     }
 

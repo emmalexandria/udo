@@ -1,10 +1,9 @@
-use std::ffi::{CStr, CString, c_char, c_int};
+use std::ffi::c_void;
+use std::ffi::{CString, c_char, c_int};
 use std::ptr;
-use std::{ffi::c_void, mem::MaybeUninit};
 
 use anyhow::Result;
 use nix::libc;
-use nix::unistd::User;
 use pam_sys::{PamConversation, PamHandle, PamMessage, PamResponse, wrapped::start};
 use pam_sys::{PamFlag, PamItemType, PamReturnCode, wrapped::*};
 

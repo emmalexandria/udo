@@ -4,6 +4,13 @@ use crossterm::style::{ContentStyle, StyledContent, Stylize};
 
 pub mod prompt;
 
+fn block(style: &ContentStyle, name: &str, icon: &str) -> MultiStyled<String> {
+    MultiStyled::default()
+        .with(style.apply(format!(" {icon} ")))
+        .with(style.apply("[udo]".to_string()).bold())
+        .with(style.apply(format!(" {name} ")))
+}
+
 pub fn error<D: Display>(error: D, icon: bool) {
     let icon = match icon {
         true => '',
@@ -11,12 +18,41 @@ pub fn error<D: Display>(error: D, icon: bool) {
     };
 
     let style = ContentStyle::default().on_red().black();
-    let block = style.apply(format!(" {icon} ERROR "));
+    let block = block(&style, "Error", &icon.to_string());
 
-    println!("{block} {error}");
+    eprintln!("{block} {error}");
 }
 
-pub fn wrong_password() {}
+pub fn info<D: Display>(info: D, icon: bool) {
+    let icon = match icon {
+        true => '',
+        false => '#',
+    };
+
+    let style = ContentStyle::default().on_blue().black();
+    let block = block(&style, "Info", &icon.to_string());
+
+    println!("{block} {info}");
+}
+
+pub fn wrong_password(icon: bool, tries: usize) {
+    let icon = match icon {
+        true => '',
+        false => '?',
+    };
+
+    let style = ContentStyle::default().on_yellow().black();
+    let block = block(&style, "Warning", &icon.to_string());
+
+    let try_text = if tries > 1 { "tries" } else { "try" };
+
+    println!("{block} Incorrect. {tries} {try_text} remaining.")
+}
+
+pub fn lockout(lockout: i64) {
+    let lock = format!("{} minutes", lockout).stylize().yellow().bold();
+    println!("Max number of attempts reached. Locked out for {lock}.")
+}
 
 #[derive(Default, Debug, Clone)]
 pub struct MultiStyled<D>
