@@ -10,8 +10,10 @@ pub fn get_cli() -> Command {
                 .help("The command to run")
                 .trailing_var_arg(true)
                 .num_args(0..)
+                .allow_hyphen_values(true)
                 .required_unless_present_any(["clear"]),
         )
+        .arg(Arg::new("nocheck").help("Skips validating the permissions and owner of udo").short('n').long("nocheck").action(ArgAction::SetTrue))
         .arg(
             Arg::new("user")
                 .short('u')

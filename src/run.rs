@@ -37,11 +37,10 @@ pub fn elevate_to(target: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn run<S: ToString>(cmd: S, do_as: &User) -> Result<()> {
-    let cmd = cmd.to_string();
-    let mut split = cmd.split(" ");
-    let cmd_name = split.next().unwrap();
-    let args: Vec<&str> = split.collect();
+pub fn run<S: ToString>(cmd: Vec<&S>, do_as: &User) -> Result<()> {
+    let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    let cmd_name = &cmd[0];
+    let args = cmd.iter().map(String::as_str).collect();
 
     unsafe {
         match fork() {
