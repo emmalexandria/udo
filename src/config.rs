@@ -5,6 +5,25 @@ use serde::{Deserialize, Serialize};
 
 const CONFIG_PATH: &str = "/etc/udo/config.toml";
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Rule {
+    target: String,
+    host: String,
+    run_as: String,
+    command: String,
+}
+
+impl Rule {
+    pub fn new(target: String, host: String, run_as: String, command: String) -> Self {
+        Self {
+            target,
+            host,
+            run_as,
+            command,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct DisplayConfig {
     #[serde(default)]
@@ -28,10 +47,21 @@ impl Default for DisplayConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     #[serde(default)]
     pub display: DisplayConfig,
+    #[serde(default)]
+    pub rules: Vec<Rule>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            display: DisplayConfig::default(),
+            rules: vec![],
+        }
+    }
 }
 
 impl Config {

@@ -7,12 +7,14 @@ use crossterm::{
     cursor::MoveToColumn,
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
-    style::Stylize,
+    style::{ContentStyle, Stylize},
     terminal::{Clear, ClearType, enable_raw_mode},
 };
 
+use crate::output::MultiStyled;
+
 pub struct InputPrompt {
-    prompt: Option<String>,
+    prompt: Option<MultiStyled<String>>,
     obscure: bool,
 }
 
@@ -27,12 +29,12 @@ impl Default for InputPrompt {
 
 impl InputPrompt {
     pub fn password_prompt(mut self) -> Self {
-        self.prompt = Some(" 󰒃 Password: ".to_string());
-        self
-    }
-
-    pub fn with_prompt<S: ToString>(mut self, prompt: S) -> Self {
-        self.prompt = Some(prompt.to_string());
+        let base = ContentStyle::default().on_green().black();
+        let prompt = MultiStyled::default()
+            .with(base.apply(" 󰒃 ".to_string()))
+            .with(base.apply("[udo]".to_string()).bold())
+            .with(base.apply(" Password:".to_string()));
+        self.prompt = Some(prompt);
         self
     }
 
@@ -50,7 +52,7 @@ impl InputPrompt {
 
         while running {
             if let Some(p) = &self.prompt {
-                print!("{} ", p.clone().stylize().on_green().black());
+                print!("{p} ")
             }
 
             if self.obscure {

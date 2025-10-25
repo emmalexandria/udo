@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use crossterm::{
     style::force_color_output,
     terminal::{disable_raw_mode, enable_raw_mode},
@@ -5,15 +7,18 @@ use crossterm::{
 use nix::unistd::{geteuid, getuid};
 
 use crate::{
+    authenticate::{AuthResult, authenticate},
     cli::get_cli,
     config::Config,
     output::prompt::InputPrompt,
     run::{elevate, run},
 };
 
+mod authenticate;
 mod cli;
 mod config;
 mod output;
+mod pam;
 mod run;
 
 fn main() {
@@ -25,14 +30,28 @@ fn main() {
         force_color_output(false);
     }
 
-    if let Some(command) = matches.get_one::<String>("command") {
-        enable_raw_mode().unwrap();
-        let prompt = InputPrompt::default()
-            .password_prompt()
-            .obscure(config.display.censor);
-        let input = prompt.run();
-        disable_raw_mode().unwrap();
-        elevate().unwrap();
-        run(command).unwrap();
+    if getuid().is_root() {
+        output::error("Already running as root", config.display.nerd);
+        exit(1);
     }
+
+    if let Some(command) = matches.get_one::<String>("command") {
+        let password = prompt_password(&config);
+        elevate().unwrap();
+        if let Ok(AuthResult::Success) = authenticate(password, &config) {
+            run(command).unwrap();
+        }
+    }
+}
+
+fn prompt_password(config: &Config) -> String {
+    enable_raw_mode().unwrap();
+    let prompt = InputPrompt::default()
+        .password_prompt()
+        .obscure(config.display.censor);
+
+    let res = prompt.run().unwrap();
+
+    disable_raw_mode().unwrap();
+    res
 }
