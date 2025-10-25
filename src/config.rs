@@ -1,28 +1,12 @@
 use anyhow::Result;
+use nix::unistd::User;
 use std::fs;
 
 use serde::{Deserialize, Serialize};
 
+use crate::authenticate::Rule;
+
 const CONFIG_PATH: &str = "/etc/udo/config.toml";
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Rule {
-    target: String,
-    host: String,
-    run_as: String,
-    command: String,
-}
-
-impl Rule {
-    pub fn new(target: String, host: String, run_as: String, command: String) -> Self {
-        Self {
-            target,
-            host,
-            run_as,
-            command,
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SecurityConfig {

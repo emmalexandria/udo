@@ -1,6 +1,7 @@
 use std::{
     env,
     ffi::{CString, OsStr},
+    io,
     process::exit,
 };
 
@@ -26,10 +27,17 @@ pub fn elevate() -> Result<()> {
 pub fn elevate_to(target: &str) -> Result<()> {
     let user = User::from_name(target)?;
 
+    if let Some(u) = user {
+        setuid(u.uid)?;
+        setgid(u.gid)?;
+    } else {
+        return Err(io::Error::new(io::ErrorKind::NotFound, "target user not found").into());
+    }
+
     Ok(())
 }
 
-pub fn run<S: ToString>(cmd: S) -> Result<()> {
+pub fn run<S: ToString>(cmd: S, do_as: &User) -> Result<()> {
     let cmd = cmd.to_string();
     let mut split = cmd.split(" ");
     let cmd_name = split.next().unwrap();
@@ -38,7 +46,7 @@ pub fn run<S: ToString>(cmd: S) -> Result<()> {
     unsafe {
         match fork() {
             Ok(ForkResult::Parent { child }) => parent(child)?,
-            Ok(ForkResult::Child) => child(cmd_name, args)?,
+            Ok(ForkResult::Child) => child(cmd_name, args, do_as)?,
             Err(e) => return Err(e.into()),
         }
     }
@@ -55,18 +63,17 @@ fn parent(child: Pid) -> Result<()> {
     }
 }
 
-fn child(cmd_name: &str, args: Vec<&str>) -> Result<()> {
+fn child(cmd_name: &str, args: Vec<&str>, do_as: &User) -> Result<()> {
     let program = CString::new(cmd_name)?;
     let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
+
+    elevate_to(&do_as.name)?;
 
     unsafe {
         clear_env();
         umask(Mode::from_bits(0o022).unwrap());
         reset_signal_handlers();
     }
-
-    setgid(Gid::from_raw(0))?;
-    setuid(Uid::from_raw(0))?;
 
     execvp(&program, &args)?;
 

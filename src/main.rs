@@ -13,7 +13,7 @@ use crate::{
     cli::get_cli,
     config::Config,
     output::{lockout, prompt::InputPrompt, wrong_password},
-    run::{elevate, run},
+    run::{elevate, elevate_to, run},
 };
 
 mod authenticate;
@@ -34,6 +34,9 @@ fn main() {
 
     let uid = getuid();
     let user = User::from_uid(uid).unwrap().unwrap();
+    let do_as = User::from_name(matches.get_one::<String>("user").unwrap())
+        .unwrap()
+        .unwrap();
 
     if uid.is_root() {
         output::error("Already running as root", config.display.nerd);
@@ -46,28 +49,32 @@ fn main() {
     }
 
     if let Some(command) = matches.get_one::<String>("command") {
-        check_and_run(command, &user, &config, config.security.tries).unwrap();
+        check_and_run(command, &user, &config, &do_as, config.security.tries).unwrap();
     }
 }
 
-fn check_and_run(cmd: &String, user: &User, config: &Config, tries: usize) -> Result<()> {
-    if check_cache(user, config)? {
-        elevate()?;
-        after_auth(cmd, user)?;
+fn check_and_run(
+    cmd: &String,
+    user: &User,
+    config: &Config,
+    do_as: &User,
+    tries: usize,
+) -> Result<()> {
+    if do_as.uid.is_root() && check_cache(user, config)? {
+        after_auth(cmd, user, do_as)?;
         return Ok(());
     }
 
     let password = prompt_password(config);
-    let auth = authenticate(password, config);
+    let auth = authenticate(user, password, config, do_as, cmd);
 
-    elevate()?;
     match auth {
-        Ok(AuthResult::Success) => after_auth(cmd, user)?,
+        Ok(AuthResult::Success) => after_auth(cmd, user, do_as)?,
         Ok(AuthResult::NotAuthorised) => {}
         Ok(AuthResult::AuthenticationFailure) => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
-                check_and_run(cmd, user, config, tries - 1)?;
+                check_and_run(cmd, user, config, do_as, tries - 1)?;
             } else {
                 lockout(config.security.lockout);
                 process::exit(0);
@@ -79,10 +86,14 @@ fn check_and_run(cmd: &String, user: &User, config: &Config, tries: usize) -> Re
     Ok(())
 }
 
-fn after_auth(cmd: &String, user: &User) -> Result<()> {
-    create_cache_dir(&user.name)?;
-    cache_run(user)?;
-    run(cmd)?;
+fn after_auth(cmd: &String, user: &User, do_as: &User) -> Result<()> {
+    elevate_to(&do_as.name)?;
+    if do_as.uid.is_root() {
+        create_cache_dir(&user.name)?;
+        cache_run(user)?;
+    }
+
+    run(cmd, do_as)?;
     process::exit(0)
 }
 
