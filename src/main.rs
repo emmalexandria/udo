@@ -18,6 +18,7 @@ use crate::{
     cache::{cache_run, check_cache, clear_cache, create_cache_dir},
     cli::get_cli,
     config::Config,
+    elevate::ElevatedContext,
     output::{lockout, prompt::InputPrompt, wrong_password},
     run::{elevate, elevate_to, run},
 };
@@ -29,6 +30,12 @@ mod config;
 mod elevate;
 mod output;
 mod run;
+
+struct UdoRun {
+    pub command: Vec<String>,
+    pub user: User,
+    pub do_as: User,
+}
 
 fn main() {
     let cli = get_cli();
@@ -43,31 +50,45 @@ fn main() {
         process::exit(1)
     }
 
-    let uid = getuid();
-    let user = User::from_uid(uid).unwrap().unwrap();
-    let do_as = User::from_name(matches.get_one::<String>("user").unwrap())
-        .unwrap()
-        .unwrap();
+    let do_as_opt = User::from_name(
+        &matches
+            .get_one::<String>("user")
+            .cloned()
+            .unwrap_or("root".to_string()),
+    )
+    .unwrap();
+    if do_as_opt.is_none() {
+        output::error("Target user not found", config.display.nerd);
+        process::exit(1);
+    }
 
-    if uid == do_as.uid {
+    let do_as = do_as_opt.unwrap();
+
+    let user = User::from_uid(getuid()).unwrap().unwrap();
+
+    if user.uid == do_as.uid {
         output::error("Already running as target user", config.display.nerd);
         exit(1);
     }
 
     if let Some(true) = matches.get_one::<bool>("clear") {
-        elevate().unwrap();
+        let mut context = ElevatedContext::new(user.uid, Uid::from_raw(0));
+        context.elevate();
         clear_cache(&user).unwrap();
     }
 
-    if let Some(command) = matches.get_many::<String>("command") {
-        check_and_run(
-            command.collect(),
-            &user,
-            &config,
-            &do_as,
-            config.security.tries,
-        )
-        .unwrap();
+    let cmd = matches.get_many::<String>("command");
+
+    if let Some(cmd_vals) = cmd {
+        let command = cmd_vals.cloned().collect();
+
+        let run = UdoRun {
+            command,
+            do_as,
+            user,
+        };
+
+        check_and_run(&run, &config, config.security.tries);
     }
 }
 
@@ -92,28 +113,22 @@ fn check_perms(config: &Config) -> bool {
     valid
 }
 
-fn check_and_run(
-    args: Vec<&String>,
-    user: &User,
-    config: &Config,
-    do_as: &User,
-    tries: usize,
-) -> Result<()> {
-    if do_as.uid.is_root() && check_cache(user, config)? {
-        after_auth(args, user, do_as)?;
+fn check_and_run(run: &UdoRun, config: &Config, tries: usize) -> Result<()> {
+    if run.do_as.uid.is_root() && check_cache(&run.user, config)? {
+        after_auth(run, false)?;
         return Ok(());
     }
 
     let password = prompt_password(config);
-    let auth = authenticate(user, password, config, do_as, args[0]);
+    let auth = authenticate(&run.user, password, config, &run.do_as, &run.command[0]);
 
     match auth {
-        Ok(AuthResult::Success) => after_auth(args, user, do_as)?,
+        Ok(AuthResult::Success) => after_auth(run, true)?,
         Ok(AuthResult::NotAuthorised) => {}
         Ok(AuthResult::AuthenticationFailure) => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
-                check_and_run(args, user, config, do_as, tries - 1)?;
+                check_and_run(run, config, tries - 1)?;
             } else {
                 lockout(config.security.lockout);
                 process::exit(0);
@@ -125,14 +140,15 @@ fn check_and_run(
     Ok(())
 }
 
-fn after_auth(cmd: Vec<&String>, user: &User, do_as: &User) -> Result<()> {
-    elevate_to(&do_as.name)?;
-    if do_as.uid.is_root() {
-        create_cache_dir(&user.name)?;
-        cache_run(user)?;
+fn after_auth(udo_run: &UdoRun, with_pass: bool) -> Result<()> {
+    let mut context = ElevatedContext::new(udo_run.user.uid, udo_run.do_as.uid);
+    context.elevate()?;
+    if udo_run.do_as.uid.is_root() && with_pass {
+        create_cache_dir(&udo_run.user.name)?;
+        cache_run(&udo_run.user)?;
     }
 
-    run(cmd, do_as)?;
+    run(&udo_run.command, &udo_run.do_as)?;
     process::exit(0)
 }
 

@@ -38,6 +38,8 @@ pub struct DisplayConfig {
     pub nerd: bool,
     #[serde(default)]
     pub censor: bool,
+    #[serde(default)]
+    pub display_pw: bool,
 }
 
 impl Default for DisplayConfig {
@@ -47,6 +49,7 @@ impl Default for DisplayConfig {
             unicode: true,
             nerd: false,
             censor: true,
+            display_pw: true,
         }
     }
 }

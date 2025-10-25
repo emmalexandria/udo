@@ -12,10 +12,9 @@ const CACHE_DIR: &str = "/var/run/udo";
 
 use anyhow::Result;
 use nix::{
-    fcntl::open,
     sys::time::TimeValLike,
     time::{ClockId, clock_gettime},
-    unistd::{Uid, User, chown, getppid, getuid, ttyname},
+    unistd::{User, getppid, ttyname},
 };
 use serde::{Deserialize, Serialize};
 use toml::Deserializer;
@@ -107,6 +106,9 @@ pub fn clear_cache(user: &User) -> Result<PathBuf> {
     let mut dir = get_cache_dir(&user.name);
     dir.push(id);
 
-    fs::remove_dir_all(&dir)?;
+    if dir.exists() && dir.is_dir() {
+        fs::remove_dir_all(&dir)?;
+    }
+
     Ok(dir)
 }

@@ -37,7 +37,7 @@ pub fn elevate_to(target: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn run<S: ToString>(cmd: Vec<&S>, do_as: &User) -> Result<()> {
+pub fn run<S: ToString>(cmd: &Vec<S>, do_as: &User) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     let cmd_name = &cmd[0];
     let args = cmd.iter().map(String::as_str).collect();
