@@ -14,9 +14,17 @@ use nix::{
     unistd::{ForkResult, Gid, Pid, Uid, User, execvp, fork, setgid, setuid},
 };
 
+use crate::config::Config;
+
 pub fn elevate() -> Result<()> {
     setuid(Uid::from_raw(0))?;
     setgid(Gid::from_raw(0))?;
+
+    Ok(())
+}
+
+pub fn elevate_to(target: &str) -> Result<()> {
+    let user = User::from_name(target)?;
 
     Ok(())
 }
