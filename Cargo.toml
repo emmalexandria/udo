@@ -1,6 +1,8 @@
 [package]
 name = "udo"
+description = "A modern replacement for sudo/doas"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
