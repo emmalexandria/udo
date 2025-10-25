@@ -1,11 +1,11 @@
+mod pam;
+
 use std::process::Command;
 
 use anyhow::Result;
-#[cfg(target_os = "linux")]
-use nix::unistd::Gid;
 use nix::unistd::{Gid, Group, User, getuid};
 
-use crate::{config::Config, output, pam::authenticate_user};
+use crate::{authenticate::pam::authenticate_user, config::Config, output};
 
 pub enum AuthResult {
     NotAuthorised,

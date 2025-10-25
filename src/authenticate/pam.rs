@@ -6,7 +6,7 @@ use anyhow::Result;
 use nix::libc;
 use nix::unistd::User;
 use pam_sys::{PamConversation, PamHandle, PamMessage, PamResponse, wrapped::start};
-use pam_sys::{PamFlag, PamReturnCode, wrapped::*};
+use pam_sys::{PamFlag, PamItemType, PamReturnCode, wrapped::*};
 
 const PAM_SUCCESS: c_int = 0;
 const PAM_BUF_ERR: c_int = 5;
@@ -110,35 +110,40 @@ pub fn authenticate_user(username: &str, password: &str, service: &str) -> Resul
             &mut pamh,
         );
 
-        let mut_ptr = pamh.as_mut().unwrap();
-
         if ret != PamReturnCode::SUCCESS {
-            return Err(format!("pam_start failed: {}", get_pam_error(mut_ptr, ret)));
+            return Err(format!(
+                "pam_start failed: {}",
+                get_pam_error(&mut *pamh, ret)
+            ));
         }
 
+        let rhost = CString::new("localhost").unwrap();
+        let rhost_raw = rhost.as_ptr() as *const c_void;
+        set_item(&mut *pamh, PamItemType::RHOST, &*rhost_raw);
+
         // Authenticate the user
-        ret = authenticate(mut_ptr, PamFlag::NONE);
+        ret = authenticate(&mut *pamh, PamFlag::NONE);
         if ret != PamReturnCode::SUCCESS {
-            end(mut_ptr, ret);
+            end(&mut *pamh, ret);
             return Err(format!(
                 "Authentication failed: {}, {}",
-                get_pam_error(mut_ptr, ret),
+                get_pam_error(&mut *pamh, ret),
                 ret
             ));
         }
 
         // Validate account (check if account is valid, not expired, etc.)
-        ret = acct_mgmt(mut_ptr, PamFlag::NONE);
+        ret = acct_mgmt(&mut *pamh, PamFlag::NONE);
         if ret != PamReturnCode::SUCCESS {
-            end(mut_ptr, ret);
+            end(&mut *pamh, ret);
             return Err(format!(
                 "Account validation failed: {}",
-                get_pam_error(mut_ptr, ret)
+                get_pam_error(&mut *pamh, ret)
             ));
         }
 
         // Clean up
-        end(mut_ptr, PamReturnCode::SUCCESS);
+        end(&mut *pamh, PamReturnCode::SUCCESS);
 
         Ok(true)
     }

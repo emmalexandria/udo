@@ -18,7 +18,6 @@ mod authenticate;
 mod cli;
 mod config;
 mod output;
-mod pam;
 mod run;
 
 fn main() {
@@ -37,8 +36,8 @@ fn main() {
 
     if let Some(command) = matches.get_one::<String>("command") {
         let password = prompt_password(&config);
-        elevate().unwrap();
         if let Ok(AuthResult::Success) = authenticate(password, &config) {
+            elevate().unwrap();
             run(command).unwrap();
         }
     }
