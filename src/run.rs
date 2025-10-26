@@ -6,7 +6,6 @@ use anyhow::Result;
 
 pub mod env;
 pub mod process;
-pub mod shell;
 
 pub fn do_run(run: &UdoRun) -> Result<()> {
     match run.c_type {

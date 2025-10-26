@@ -19,7 +19,7 @@ use crate::{
     cli::get_cli,
     config::Config,
     output::{lockout, not_authenticated, prompt::InputPrompt, prompt_password, wrong_password},
-    run::{do_run, env::Env, process::run_process, shell::get_shell_cmd},
+    run::{do_run, env::Env, process::run_process},
 };
 
 mod authenticate;
@@ -41,6 +41,7 @@ struct UdoRun {
     pub command: Vec<String>,
     pub c_type: CommandType,
     pub preserve_vars: bool,
+    pub clear_cache: bool,
     pub user: User,
     pub do_as: User,
 }
@@ -81,33 +82,32 @@ fn main() -> color_eyre::Result<()> {
         exit(1);
     }
 
-    let mut cache = Cache::new(&user, &do_as);
-    if let Some(true) = matches.get_one::<bool>("clear") {
-        cache.clear().unwrap();
-        output::info(
-            format!("Cleared cache for \"{}\" of all entries", user.name),
-            config.display.nerd,
-        );
-    }
+    let clear_cache = matches
+        .get_one::<bool>("clear")
+        .copied()
+        .unwrap_or_default();
 
     let preserve_vars = matches
         .get_one::<bool>("preserve")
         .copied()
         .unwrap_or_default();
 
+    let mut cache = Cache::new(&user, &do_as);
+
     if let Some(("--shell", matches)) = matches.subcommand() {
         let login = matches.get_one::<bool>("login").copied().unwrap_or(false);
-        let shell = get_shell_cmd(&user).to_string_lossy().to_string();
+        let shell = do_as.shell.to_string_lossy().to_string();
 
         let run = UdoRun {
             command: vec![shell],
             c_type: CommandType::Shell(login),
+            clear_cache,
             preserve_vars,
             do_as,
             user,
         };
 
-        match check_and_run(&run, &config, &mut cache, config.security.tries) {
+        match login_user(&run, &config, &mut cache, config.security.tries) {
             Ok(_) => {}
             Err(e) => output::error(
                 format!("Failed to run command, error: {e}"),
@@ -124,12 +124,13 @@ fn main() -> color_eyre::Result<()> {
         let run = UdoRun {
             command,
             c_type: CommandType::Command,
+            clear_cache,
             preserve_vars,
             do_as,
             user,
         };
 
-        check_and_run(&run, &config, &mut cache, config.security.tries).unwrap();
+        login_user(&run, &config, &mut cache, config.security.tries).unwrap();
         return Ok(());
     }
 
@@ -157,11 +158,11 @@ fn check_perms(config: &Config) -> bool {
     valid
 }
 
-fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize) -> Result<()> {
+fn login_user(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize) -> Result<()> {
     if run.do_as.uid.is_root() {
         match cache.check_cache(run, config) {
             Ok(true) => {
-                after_auth(run, cache, false)?;
+                after_login(run, config, cache, false)?;
             }
             Ok(false) => {}
             Err(e) => output::error(
@@ -188,11 +189,11 @@ fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize)
     );
 
     match auth {
-        Ok(AuthResult::Success) => after_auth(run, cache, true)?,
+        Ok(AuthResult::Success) => after_login(run, config, cache, true)?,
         Ok(AuthResult::NotAuthenticated) => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
-                check_and_run(run, config, cache, tries - 1)?;
+                login_user(run, config, cache, tries - 1)?;
             } else {
                 lockout(config);
                 process::exit(0);
@@ -213,7 +214,20 @@ fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize)
     Ok(())
 }
 
-fn after_auth(udo_run: &UdoRun, cache: &mut Cache, with_pass: bool) -> Result<()> {
+fn after_login(
+    udo_run: &UdoRun,
+    config: &Config,
+    cache: &mut Cache,
+    with_pass: bool,
+) -> Result<()> {
+    if udo_run.clear_cache {
+        cache.clear().unwrap();
+        output::info(
+            format!("Cleared cache for \"{}\" of all entries", udo_run.user.name),
+            config.display.nerd,
+        );
+    }
+
     if udo_run.do_as.uid.is_root() && with_pass {
         cache.create_dir()?;
         cache.cache_run(udo_run)?;

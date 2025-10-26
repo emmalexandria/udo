@@ -103,7 +103,7 @@ impl Cache {
         let entry = CacheEntry::deserialize(de)?;
         self.context.restore()?;
 
-        let time_valid = time.num_seconds() - entry.timestamp < config.security.timeout;
+        let time_valid = time.num_minutes() - entry.timestamp < config.security.timeout;
         let user_valid = entry.uid == run.user.uid.as_raw();
 
         Ok(time_valid && user_valid)
