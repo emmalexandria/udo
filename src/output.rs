@@ -1,11 +1,28 @@
 use std::fmt::Display;
 
-use crossterm::style::{ContentStyle, StyledContent, Stylize};
+use anyhow::Result;
+use crossterm::{
+    style::{ContentStyle, StyledContent, Stylize},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 use nix::unistd::User;
 
-use crate::config::Config;
+use crate::{config::Config, output::prompt::InputPrompt};
 
 pub mod prompt;
+
+pub fn prompt_password(config: &Config) -> Result<String> {
+    enable_raw_mode()?;
+    let prompt = InputPrompt::default()
+        .password_prompt()
+        .obscure(config.display.censor)
+        .display_pw(config.display.display_pw);
+
+    let res = prompt.run()?;
+
+    disable_raw_mode()?;
+    Ok(res)
+}
 
 fn block(style: &ContentStyle, name: &str, icon: &str) -> MultiStyled<String> {
     MultiStyled::default()

@@ -18,8 +18,8 @@ use crate::{
     cache::Cache,
     cli::get_cli,
     config::Config,
-    output::{lockout, not_authenticated, prompt::InputPrompt, wrong_password},
-    run::{env::Env, process::run_process, shell::get_shell_cmd},
+    output::{lockout, not_authenticated, prompt::InputPrompt, prompt_password, wrong_password},
+    run::{do_run, env::Env, process::run_process, shell::get_shell_cmd},
 };
 
 mod authenticate;
@@ -172,7 +172,20 @@ fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize)
     }
 
     let password = prompt_password(config);
-    let auth = authenticate(&run.user, password, config, &run.do_as, &run.command[0]);
+    if let Err(e) = &password {
+        output::error(
+            format!("Failed to display password prompt ({})", e),
+            config.display.nerd,
+        );
+    }
+
+    let auth = authenticate(
+        &run.user,
+        password.unwrap(),
+        config,
+        &run.do_as,
+        &run.command[0],
+    );
 
     match auth {
         Ok(AuthResult::Success) => after_auth(run, cache, true)?,
@@ -206,24 +219,6 @@ fn after_auth(udo_run: &UdoRun, cache: &mut Cache, with_pass: bool) -> Result<()
         cache.cache_run(udo_run)?;
     }
 
-    let env = match udo_run.c_type {
-        CommandType::Command => Env::process_env(&udo_run),
-        CommandType::Shell(l) => Env::shell_env(&udo_run),
-    };
-
-    run_process(&udo_run.command, &env)?;
+    do_run(udo_run)?;
     process::exit(0)
-}
-
-fn prompt_password(config: &Config) -> String {
-    enable_raw_mode().unwrap();
-    let prompt = InputPrompt::default()
-        .password_prompt()
-        .obscure(config.display.censor)
-        .display_pw(config.display.display_pw);
-
-    let res = prompt.run().unwrap();
-
-    disable_raw_mode().unwrap();
-    res
 }
