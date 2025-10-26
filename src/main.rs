@@ -10,7 +10,7 @@ use crossterm::{
 };
 use nix::{
     sys::stat::{Mode, stat},
-    unistd::{Uid, User, geteuid, getuid},
+    unistd::{Uid, User, getuid},
 };
 
 use crate::{
@@ -18,9 +18,8 @@ use crate::{
     cache::Cache,
     cli::get_cli,
     config::Config,
-    elevate::ElevatedContext,
     output::{lockout, prompt::InputPrompt, wrong_password},
-    run::run,
+    run::process::run_process,
 };
 
 mod authenticate;
@@ -144,7 +143,7 @@ fn after_auth(udo_run: &UdoRun, cache: &mut Cache, with_pass: bool) -> Result<()
         cache.cache_run(udo_run)?;
     }
 
-    run(&udo_run.command, &udo_run.do_as)?;
+    run_process(&udo_run.command, &udo_run.do_as)?;
     process::exit(0)
 }
 
