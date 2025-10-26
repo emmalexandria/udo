@@ -1,6 +1,5 @@
 use std::{
     env,
-    ffi::OsStr,
     process::{self, exit},
 };
 
