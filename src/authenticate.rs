@@ -151,7 +151,7 @@ pub fn authenticate(
 
     let matching = allowed_actions.iter().find(|a| a.contains(&action));
 
-    if let Some(m_action) = matching {
+    if matching.is_some() {
         let auth = authenticate_user(&user.name, &password, "udo");
         if auth.is_err() || auth.is_ok_and(|v| !v) {
             return Ok(AuthResult::AuthenticationFailure);

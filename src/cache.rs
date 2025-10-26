@@ -1,10 +1,7 @@
 use std::{
     fs::{self, File, Permissions},
     io::{Write, stdin},
-    os::{
-        fd::AsFd,
-        unix::fs::PermissionsExt,
-    },
+    os::{fd::AsFd, unix::fs::PermissionsExt},
     path::PathBuf,
 };
 
@@ -53,7 +50,7 @@ impl Cache {
         path
     }
 
-    pub fn create_dir(&mut self, user: &User) -> Result<PathBuf> {
+    pub fn create_dir(&mut self) -> Result<PathBuf> {
         self.context.elevate()?;
         if fs::exists(&self.dir)? {
             let md = fs::metadata(&self.dir)?;

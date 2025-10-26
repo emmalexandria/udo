@@ -155,7 +155,7 @@ fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize)
 
 fn after_auth(udo_run: &UdoRun, cache: &mut Cache, with_pass: bool) -> Result<()> {
     if udo_run.do_as.uid.is_root() && with_pass {
-        cache.create_dir(&udo_run.user)?;
+        cache.create_dir()?;
         cache.cache_run(udo_run)?;
     }
 

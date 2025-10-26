@@ -14,7 +14,7 @@ use crate::{
     run::env::{clear_env, reset_signal_handlers},
 };
 
-pub fn run_process<S: ToString>(cmd: &Vec<S>, do_as: &User) -> Result<()> {
+pub fn run_process<S: ToString>(cmd: &[S], do_as: &User) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     let cmd_name = &cmd[0];
     let args = cmd.iter().map(String::as_str).collect();
