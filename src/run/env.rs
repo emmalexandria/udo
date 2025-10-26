@@ -1,9 +1,6 @@
-use std::{env, ffi::OsStr, io};
+use std::env;
 
-use nix::{
-    sys::signal::{self, SigHandler, Signal},
-    unistd::{Uid, User, setuid},
-};
+use nix::unistd::{User, setuid};
 
 use anyhow::Result;
 
@@ -55,9 +52,9 @@ impl Env {
 
     pub fn shell_env(run: &UdoRun) -> Self {
         match run.c_type {
-            CommandType::Shell(true) => Self::login_env(&run),
-            CommandType::Shell(false) => Self::non_login_env(&run),
-            CommandType::Command => Self::non_login_env(&run),
+            CommandType::Shell(true) => Self::login_env(run),
+            CommandType::Shell(false) => Self::non_login_env(run),
+            CommandType::Command => Self::non_login_env(run),
         }
     }
 

@@ -15,7 +15,7 @@ pub fn do_run(run: &UdoRun) -> Result<()> {
 }
 
 fn process(run: &UdoRun) -> Result<()> {
-    let env = Env::process_env(&run);
+    let env = Env::process_env(run);
     run_process(run.command.as_slice(), &env)?;
 
     Ok(())

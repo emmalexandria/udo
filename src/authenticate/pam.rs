@@ -6,7 +6,7 @@ use std::ptr;
 
 use nix::libc;
 use pam_sys::{PamConversation, PamHandle, PamMessage, PamResponse, wrapped::start};
-use pam_sys::{PamFlag, PamItemType, PamReturnCode, wrapped::*};
+use pam_sys::{PamFlag, PamReturnCode, wrapped::*};
 
 const PAM_SUCCESS: c_int = 0;
 const PAM_BUF_ERR: c_int = 5;
