@@ -1,6 +1,5 @@
-use std::path::PathBuf;
 
-use clap::{Arg, ArgAction, Command, command, value_parser};
+use clap::{Arg, ArgAction, Command, command};
 
 pub fn get_cli() -> Command {
     command!()

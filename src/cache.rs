@@ -1,8 +1,8 @@
 use std::{
     fs::{self, File, Permissions},
-    io::{self, Write, stdin},
+    io::{Write, stdin},
     os::{
-        fd::{AsFd, RawFd},
+        fd::AsFd,
         unix::fs::PermissionsExt,
     },
     path::PathBuf,
@@ -14,7 +14,7 @@ use anyhow::Result;
 use nix::{
     sys::time::TimeValLike,
     time::{ClockId, clock_gettime},
-    unistd::{Uid, User, getppid, ttyname},
+    unistd::{User, getppid, ttyname},
 };
 use serde::{Deserialize, Serialize};
 use toml::Deserializer;
@@ -29,7 +29,7 @@ pub struct Cache {
 
 impl Cache {
     pub fn new(user: &User, root: &User) -> Self {
-        let dir = Self::get_dir(&user);
+        let dir = Self::get_dir(user);
         Self {
             context: ElevatedContext::new(user.uid, root.uid),
             dir,
@@ -48,7 +48,7 @@ impl Cache {
     }
 
     pub fn get_dir(user: &User) -> PathBuf {
-        let mut path = PathBuf::from(CACHE_DIR.clone());
+        let mut path = PathBuf::from(CACHE_DIR);
         path.push(&user.name);
         path
     }

@@ -1,8 +1,5 @@
 use anyhow::Result;
-use nix::{
-    libc::setreuid,
-    unistd::{Uid, geteuid, getuid, seteuid, setuid},
-};
+use nix::unistd::{Uid, geteuid, seteuid, setuid};
 
 #[derive(Debug, Clone)]
 pub struct ElevatedContext {

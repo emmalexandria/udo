@@ -8,7 +8,7 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
     style::{ContentStyle, Stylize},
-    terminal::{Clear, ClearType, enable_raw_mode},
+    terminal::{Clear, ClearType},
 };
 
 use crate::output::MultiStyled;

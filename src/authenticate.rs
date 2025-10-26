@@ -3,10 +3,10 @@ mod pam;
 use std::process::Command;
 
 use anyhow::Result;
-use nix::unistd::{Gid, Group, User, gethostname, getuid};
+use nix::unistd::{Group, User, gethostname};
 use serde::{Deserialize, Serialize};
 
-use crate::{authenticate::pam::authenticate_user, config::Config, output};
+use crate::{authenticate::pam::authenticate_user, config::Config};
 
 #[derive(Debug, Clone, Default)]
 pub enum ActionValue {
@@ -136,15 +136,15 @@ pub fn authenticate(
     do_as: &User,
     command: &str,
 ) -> Result<AuthResult> {
-    let allowed_actions = get_matching_rules(&user, config)
+    let allowed_actions = get_matching_rules(user, config)
         .into_iter()
-        .map(|r| Action::from_rule(&r, &user))
+        .map(|r| Action::from_rule(&r, user))
         .collect::<Vec<_>>();
 
     let hostname = gethostname()?;
 
     let action = Action {
-        command: ActionValue::from(command.clone()),
+        command: ActionValue::from(command),
         host: ActionValue::from(hostname.to_string_lossy().to_string()),
         run_as: ActionValue::from(do_as.name.clone()),
     };

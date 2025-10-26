@@ -1,5 +1,4 @@
 use anyhow::Result;
-use nix::unistd::User;
 use std::fs;
 
 use serde::{Deserialize, Serialize};
@@ -52,6 +51,7 @@ impl Default for DisplayConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Default)]
 pub struct Config {
     #[serde(default)]
     pub display: DisplayConfig,
@@ -61,15 +61,6 @@ pub struct Config {
     pub security: SecurityConfig,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            display: DisplayConfig::default(),
-            rules: vec![],
-            security: SecurityConfig::default(),
-        }
-    }
-}
 
 impl Config {
     pub fn read() -> Result<Self> {
