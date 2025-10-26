@@ -81,10 +81,7 @@ fn main() {
     }
 
     if let Some(("--shell", matches)) = matches.subcommand() {
-        let shell = get_shell_cmd(&user)
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or("sh".to_string());
+        let shell = get_shell_cmd(&user).to_string_lossy().to_string();
 
         let run = UdoRun {
             command: vec![shell],

@@ -1,9 +1,9 @@
-
 use clap::{Arg, ArgAction, Command, command};
 
 pub fn get_cli() -> Command {
     command!()
         .disable_help_subcommand(true)
+        .args_conflicts_with_subcommands(true)
         .arg(
             Arg::new("command")
                 .help("The command to run")
@@ -12,7 +12,13 @@ pub fn get_cli() -> Command {
                 .allow_hyphen_values(true)
                 .required_unless_present_any(["clear"]),
         )
-        .arg(Arg::new("nocheck").help("Skips validating the permissions and owner of udo").short('n').long("nocheck").action(ArgAction::SetTrue))
+        .arg(
+            Arg::new("nocheck")
+                .help("Skips validating the permissions and owner of udo")
+                .short('n')
+                .long("nocheck")
+                .action(ArgAction::SetTrue),
+        )
         .arg(
             Arg::new("user")
                 .short('u')
@@ -39,26 +45,36 @@ pub fn get_cli() -> Command {
                 .about("Runs a shell as the given user, optionally imitating a login")
                 .visible_short_flag_alias('s')
                 .arg(
-                    Arg::new("imitate")
+                    Arg::new("login")
                         .help("Imitate a full login as the given user")
-                        .long_help("Imitate a full login as the given user, loading their config, path, etc")
-                        .short('i')
-                        .long("imitate")
-                    .action(ArgAction::SetTrue),
+                        .short('l')
+                        .long("login")
+                        .action(ArgAction::SetTrue),
                 )
                 .arg(
                     Arg::new("shell")
                         .short('s')
                         .long("s")
-                        .help("Override the launched shell"),
+                        .help("Override the launched shell (with full path)"),
                 ),
         )
         .subcommand(
             command!("--config")
-            .about("Manage your udo config")
-            .visible_short_flag_alias('C')
-            .arg(Arg::new("print").short('p').long("print").action(ArgAction::SetTrue))
-            .arg(Arg::new("validate").short('v').long("validate").num_args(0..1).default_missing_value("/etc/udo/config.toml"))
+                .about("Manage your udo config")
+                .visible_short_flag_alias('C')
+                .arg(
+                    Arg::new("print")
+                        .short('p')
+                        .long("print")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("validate")
+                        .short('v')
+                        .long("validate")
+                        .num_args(0..1)
+                        .default_missing_value("/etc/udo/config.toml"),
+                ),
         )
         .subcommand_negates_reqs(true)
 }
