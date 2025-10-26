@@ -27,6 +27,7 @@ mod cache;
 mod cli;
 mod config;
 mod elevate;
+mod error;
 mod output;
 mod run;
 
