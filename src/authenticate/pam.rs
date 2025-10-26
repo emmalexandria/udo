@@ -116,7 +116,7 @@ extern "C" fn pam_conversation(
 }
 
 /// Authenticate a user with PAM
-pub fn authenticate_user(username: &str, password: &str, service: &str) -> Result<bool, AuthError> {
+pub fn authenticate_user(username: &str, password: &str, service: &str) -> Result<(), AuthError> {
     unsafe {
         let mut pamh: *mut PamHandle = ptr::null_mut();
 
@@ -146,12 +146,11 @@ pub fn authenticate_user(username: &str, password: &str, service: &str) -> Resul
             return Err(AuthError::new(
                 AuthErrorKind::StartFailure,
                 format!(
-                    "pam_start failed: {} {}",
+                    "PAM start failed: {} {}",
                     get_pam_error(&mut *pamh, ret),
                     ret
                 ),
-            )
-            .into());
+            ));
         }
 
         // let rhost = CString::new("localhost").unwrap();
@@ -169,8 +168,7 @@ pub fn authenticate_user(username: &str, password: &str, service: &str) -> Resul
                     get_pam_error(&mut *pamh, ret),
                     ret
                 ),
-            )
-            .into());
+            ));
         }
 
         // Validate account (check if account is valid, not expired, etc.)
@@ -184,14 +182,13 @@ pub fn authenticate_user(username: &str, password: &str, service: &str) -> Resul
                     get_pam_error(&mut *pamh, ret),
                     ret
                 ),
-            )
-            .into());
+            ));
         }
 
         // Clean up
         end(&mut *pamh, PamReturnCode::SUCCESS);
 
-        Ok(true)
+        Ok(())
     }
 }
 

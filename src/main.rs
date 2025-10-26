@@ -18,7 +18,7 @@ use crate::{
     cache::Cache,
     cli::get_cli,
     config::Config,
-    output::{lockout, prompt::InputPrompt, wrong_password},
+    output::{lockout, not_authorized, prompt::InputPrompt, wrong_password},
     run::{process::run_process, shell::get_shell_cmd},
 };
 
@@ -140,14 +140,15 @@ fn check_perms(config: &Config) -> bool {
 fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize) -> Result<()> {
     if run.do_as.uid.is_root() {
         match cache.check_cache(run, config) {
-            Ok(true) => after_auth(run, cache, false)?,
+            Ok(true) => {
+                after_auth(run, cache, false)?;
+            }
             Ok(false) => {}
             Err(e) => output::error(
                 format!("failed to check cache ({e}). requesting password"),
                 config.display.nerd,
             ),
         }
-        return Ok(());
     }
 
     let password = prompt_password(config);
@@ -155,8 +156,7 @@ fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize)
 
     match auth {
         Ok(AuthResult::Success) => after_auth(run, cache, true)?,
-        Ok(AuthResult::NotAuthorised) => {}
-        Ok(AuthResult::AuthenticationFailure) => {
+        Ok(AuthResult::NotAuthenticated) => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
                 check_and_run(run, config, cache, tries - 1)?;
@@ -164,6 +164,15 @@ fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize)
                 lockout(config);
                 process::exit(0);
             }
+        }
+        Ok(AuthResult::NotAuthorised) => {
+            not_authorized(&run.user, config);
+        }
+        Ok(AuthResult::AuthenticationFailure(s)) => {
+            output::error(
+                format!("Authentication with PAM failed ({s})"),
+                config.display.nerd,
+            );
         }
         Err(e) => output::error(format!("Error authenticating: {e}"), config.display.nerd),
     }

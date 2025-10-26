@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crossterm::style::{ContentStyle, StyledContent, Stylize};
+use nix::unistd::User;
 
 use crate::config::Config;
 
@@ -49,6 +50,19 @@ pub fn wrong_password(icon: bool, tries: usize) {
     let try_text = if tries > 1 { "tries" } else { "try" };
 
     println!("{block} Incorrect. {tries} {try_text} remaining.")
+}
+
+pub fn not_authorized(user: &User, config: &Config) {
+    let multi: MultiStyled<String> = MultiStyled::default().with(
+        format!(
+            "{} is not in the udo configuration. This incident won't be reported <3.",
+            user.name
+        )
+        .stylize()
+        .italic(),
+    );
+
+    eprintln!("{multi}")
 }
 
 pub fn lockout(config: &Config) {

@@ -6,7 +6,10 @@ use anyhow::Result;
 use nix::unistd::{Group, User, gethostname};
 use serde::{Deserialize, Serialize};
 
-use crate::{authenticate::pam::authenticate_user, config::Config};
+use crate::{
+    authenticate::pam::{AuthErrorKind, authenticate_user},
+    config::Config,
+};
 
 #[derive(Debug, Clone, Default)]
 pub enum ActionValue {
@@ -83,7 +86,8 @@ impl Action {
 
 pub enum AuthResult {
     NotAuthorised,
-    AuthenticationFailure,
+    AuthenticationFailure(String),
+    NotAuthenticated,
     Success,
 }
 
@@ -152,15 +156,16 @@ pub fn authenticate(
     let matching = allowed_actions.iter().find(|a| a.contains(&action));
 
     if matching.is_some() {
-        let auth = authenticate_user(&user.name, &password, "udo");
-        match auth {
-            Ok(false) => return Ok(AuthResult::AuthenticationFailure),
-            Err(e) => return Err(e.into()),
-            _ => {}
-        }
-
-        if auth.is_ok_and(|v| !v) {
-            return Ok(AuthResult::AuthenticationFailure);
+        match authenticate_user(&user.name, &password, "udo") {
+            Ok(_) => return Ok(AuthResult::Success),
+            Err(e) => match e.kind {
+                AuthErrorKind::InvalidInput | AuthErrorKind::StartFailure => {
+                    return Ok(AuthResult::AuthenticationFailure(e.to_string()));
+                }
+                AuthErrorKind::AuthenticateFailure | AuthErrorKind::ValidationFailure => {
+                    return Ok(AuthResult::NotAuthenticated);
+                }
+            },
         }
     } else {
         return Ok(AuthResult::NotAuthorised);
