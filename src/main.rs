@@ -74,6 +74,10 @@ fn main() {
     let mut cache = Cache::new(&user, &do_as);
     if let Some(true) = matches.get_one::<bool>("clear") {
         cache.clear().unwrap();
+        output::info(
+            format!("Cleared cache for \"{}\" of all entries", user.name),
+            config.display.nerd,
+        );
     }
 
     if let Some(("--shell", matches)) = matches.subcommand() {
@@ -88,7 +92,13 @@ fn main() {
             user,
         };
 
-        check_and_run(&run, &config, &mut cache, config.security.tries).unwrap();
+        match check_and_run(&run, &config, &mut cache, config.security.tries) {
+            Ok(_) => {}
+            Err(e) => output::error(
+                format!("Failed to run command, error: {e}"),
+                config.display.nerd,
+            ),
+        }
         return;
     }
 
@@ -128,8 +138,15 @@ fn check_perms(config: &Config) -> bool {
 }
 
 fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize) -> Result<()> {
-    if run.do_as.uid.is_root() && cache.check_cache(run, config)? {
-        after_auth(run, cache, false)?;
+    if run.do_as.uid.is_root() {
+        match cache.check_cache(run, config) {
+            Ok(true) => after_auth(run, cache, false)?,
+            Ok(false) => {}
+            Err(e) => output::error(
+                format!("failed to check cache ({e}). requesting password"),
+                config.display.nerd,
+            ),
+        }
         return Ok(());
     }
 

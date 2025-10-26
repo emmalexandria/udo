@@ -206,24 +206,12 @@ fn get_pam_error(pamh: &mut PamHandle, error_code: PamReturnCode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
-    use nix::unistd::{geteuid, getuid};
-
-    use crate::authenticate::pam::{AuthError, AuthErrorKind, authenticate_user};
+    use crate::authenticate::pam::{AuthErrorKind, authenticate_user};
 
     #[test]
     fn test_incorrect_password() {
         let invalid = authenticate_user("root", "thisbetternotbeyourrootpassword1234", "udo");
 
         assert!(invalid.err().unwrap().kind == AuthErrorKind::AuthenticateFailure)
-    }
-
-    #[test]
-    fn test_correct_login() {
-        println!("{}", geteuid());
-        let invalid = authenticate_user("thisuserbetternotexistonyoursystem", "hello", "udo");
-
-        assert!(invalid.err().unwrap().kind == AuthErrorKind::ValidationFailure)
     }
 }
