@@ -6,23 +6,35 @@ use nix::{
         stat::{Mode, umask},
         wait::{WaitStatus, waitpid},
     },
-    unistd::{ForkResult, Pid, User, execvp, fork},
+    unistd::{ForkResult, Pid, execvp, fork},
 };
 
-use crate::{
-    elevate::elevate_final,
-    run::env::{clear_env, reset_signal_handlers},
-};
+use crate::{CommandType, run::env::Env};
 
-pub fn run_process<S: ToString>(cmd: &[S], do_as: &User) -> Result<()> {
+pub fn run_process<S: ToString>(cmd: &[S], env: &Env) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    let cmd_name = &cmd[0];
-    let args = cmd.iter().map(String::as_str).collect();
+    let cmd_name = cmd[0].as_str();
+    let args = cmd.iter().map(String::as_str).collect::<Vec<_>>();
+
+    run_with_args(cmd_name, &args, env)?;
+
+    Ok(())
+}
+
+pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &Env) -> Result<()> {
+    let cmd_name = name.to_string();
+    let mut args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+
+    if env.command_type == CommandType::Shell(true) {
+        args[0] = format!("-{}", args[0]);
+    }
+
+    let args_str = args.iter().map(String::as_str).collect();
 
     unsafe {
         match fork() {
             Ok(ForkResult::Parent { child }) => parent(child)?,
-            Ok(ForkResult::Child) => child(cmd_name, args, do_as)?,
+            Ok(ForkResult::Child) => child(&cmd_name, args_str, env)?,
             Err(e) => return Err(e.into()),
         }
     }
@@ -39,16 +51,13 @@ fn parent(child: Pid) -> Result<()> {
     }
 }
 
-fn child(cmd_name: &str, args: Vec<&str>, do_as: &User) -> Result<()> {
+fn child(cmd_name: &str, args: Vec<&str>, env: &Env) -> Result<()> {
     let program = CString::new(cmd_name)?;
     let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
 
-    elevate_final(do_as.uid)?;
-
     unsafe {
-        clear_env(do_as);
+        env.apply();
         umask(Mode::from_bits(0o022).unwrap());
-        reset_signal_handlers();
     }
 
     execvp(&program, &args)?;

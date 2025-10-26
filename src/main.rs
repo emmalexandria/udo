@@ -19,7 +19,7 @@ use crate::{
     cli::get_cli,
     config::Config,
     output::{lockout, not_authenticated, prompt::InputPrompt, wrong_password},
-    run::{process::run_process, shell::get_shell_cmd},
+    run::{env::Env, process::run_process, shell::get_shell_cmd},
 };
 
 mod authenticate;
@@ -31,8 +31,15 @@ mod error;
 mod output;
 mod run;
 
+#[derive(PartialEq, Eq)]
+pub enum CommandType {
+    Command,
+    Shell(bool),
+}
+
 struct UdoRun {
     pub command: Vec<String>,
+    pub c_type: CommandType,
     pub user: User,
     pub do_as: User,
 }
@@ -81,10 +88,12 @@ fn main() {
     }
 
     if let Some(("--shell", matches)) = matches.subcommand() {
-        let shell = get_shell_cmd(&user).to_string_lossy().to_string();
+        let login = matches.get_one::<bool>("login").copied().unwrap_or(false);
+        let mut shell = get_shell_cmd(&user).to_string_lossy().to_string();
 
         let run = UdoRun {
             command: vec![shell],
+            c_type: CommandType::Shell(login),
             do_as,
             user,
         };
@@ -105,6 +114,7 @@ fn main() {
 
         let run = UdoRun {
             command,
+            c_type: CommandType::Command,
             do_as,
             user,
         };
@@ -183,7 +193,12 @@ fn after_auth(udo_run: &UdoRun, cache: &mut Cache, with_pass: bool) -> Result<()
         cache.cache_run(udo_run)?;
     }
 
-    run_process(&udo_run.command, &udo_run.do_as)?;
+    let env = match udo_run.c_type {
+        CommandType::Command => Env::process_env(&udo_run.do_as),
+        CommandType::Shell(l) => Env::shell_env(&udo_run.do_as, l),
+    };
+
+    run_process(&udo_run.command, &env)?;
     process::exit(0)
 }
 
