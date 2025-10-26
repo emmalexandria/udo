@@ -52,7 +52,7 @@ pub fn wrong_password(icon: bool, tries: usize) {
     println!("{block} Incorrect. {tries} {try_text} remaining.")
 }
 
-pub fn not_authorized(user: &User, config: &Config) {
+pub fn not_authenticated(user: &User, config: &Config) {
     let multi: MultiStyled<String> = MultiStyled::default().with(
         format!(
             "{} is not in the udo configuration. This incident won't be reported <3.",

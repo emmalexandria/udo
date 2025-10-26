@@ -18,7 +18,7 @@ use crate::{
     cache::Cache,
     cli::get_cli,
     config::Config,
-    output::{lockout, not_authorized, prompt::InputPrompt, wrong_password},
+    output::{lockout, not_authenticated, prompt::InputPrompt, wrong_password},
     run::{process::run_process, shell::get_shell_cmd},
 };
 
@@ -166,7 +166,7 @@ fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize)
             }
         }
         Ok(AuthResult::NotAuthorised) => {
-            not_authorized(&run.user, config);
+            not_authenticated(&run.user, config);
         }
         Ok(AuthResult::AuthenticationFailure(s)) => {
             output::error(
