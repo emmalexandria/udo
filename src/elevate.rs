@@ -8,36 +8,38 @@ use nix::{
 pub struct ElevatedContext {
     original: Uid,
     elevated: Uid,
-    is_elevated: bool,
 }
 
 impl ElevatedContext {
     pub fn new(original: Uid, elevated: Uid) -> Self {
-        Self {
-            original,
-            elevated,
-            is_elevated: false,
+        let mut ret = Self { original, elevated };
+
+        if ret.is_elevated() {
+            let _ = ret.restore();
         }
+
+        ret
     }
 
-    pub fn elevate(&mut self) -> anyhow::Result<()> {
-        if !self.is_elevated {
+    pub fn elevate(&mut self) -> Result<()> {
+        if !self.is_elevated() {
             seteuid(self.elevated)?;
         }
 
-        self.is_elevated = true;
+        Ok(())
+    }
+
+    pub fn restore(&mut self) -> Result<()> {
+        if self.is_elevated() {
+            seteuid(self.original)?;
+        }
 
         Ok(())
     }
 
-    pub fn restore(&mut self) -> anyhow::Result<()> {
-        if self.is_elevated {
-            seteuid(self.original)?;
-        }
-
-        self.is_elevated = false;
-
-        Ok(())
+    fn is_elevated(&self) -> bool {
+        let euid = geteuid();
+        euid == self.elevated
     }
 }
 

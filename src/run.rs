@@ -41,7 +41,6 @@ pub fn run<S: ToString>(cmd: &Vec<S>, do_as: &User) -> Result<()> {
 }
 
 fn parent(child: Pid) -> Result<()> {
-    println!("Hello");
     match waitpid(child, None) {
         Ok(WaitStatus::Exited(_, status)) => exit(status),
         Ok(WaitStatus::Signaled(_, signal, _)) => exit(128 + signal as i32),

@@ -71,16 +71,12 @@ fn main() {
         exit(1);
     }
 
-    println!("{} {}", geteuid(), getuid());
-
     let mut cache = Cache::new(&user, &do_as);
-
     if let Some(true) = matches.get_one::<bool>("clear") {
         cache.clear().unwrap();
     }
 
     let cmd = matches.get_many::<String>("command");
-
     if let Some(cmd_vals) = cmd {
         let command = cmd_vals.cloned().collect();
 
