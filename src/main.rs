@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
+use clap::ArgMatches;
 use crossterm::{
     style::force_color_output,
     terminal::{disable_raw_mode, enable_raw_mode},
@@ -18,8 +19,9 @@ use crate::{
     cache::Cache,
     cli::get_cli,
     config::Config,
-    output::{lockout, not_authenticated, prompt::InputPrompt, prompt_password, wrong_password},
-    run::{do_run, env::Env, process::run_process},
+    output::{lockout, not_authenticated, prompt_password, wrong_password},
+    run::do_run,
+    user::{get_root_user, get_user, get_user_by_id},
 };
 
 mod authenticate;
@@ -30,18 +32,21 @@ mod elevate;
 mod error;
 mod output;
 mod run;
+mod user;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum CommandType {
     Command,
     Shell(bool),
 }
 
+#[derive(Debug, Clone)]
 struct UdoRun {
     pub command: Vec<String>,
     pub c_type: CommandType,
     pub preserve_vars: bool,
     pub clear_cache: bool,
+    pub cache: Cache,
     pub user: User,
     pub do_as: User,
 }
@@ -57,25 +62,40 @@ fn main() -> color_eyre::Result<()> {
         force_color_output(false);
     }
 
-    if !matches.get_one::<bool>("nocheck").copied().unwrap_or(false) && !check_perms(&config) {
+    let nocheck = matches
+        .get_one::<bool>("nocheck")
+        .copied()
+        .unwrap_or_default();
+
+    if !nocheck && !check_perms(&config) {
         process::exit(1)
     }
 
-    let do_as_opt = User::from_name(
+    let mut udo_run = create_run(matches, &config);
+
+    match login_user(&mut udo_run, &config, config.security.tries) {
+        Ok(true) => after_login(&mut udo_run, &config).unwrap(),
+        Ok(false) => output::info("Login failed", config.display.nerd),
+        Err(e) => output::error(format!("Error while logging in {}", e), config.display.nerd),
+    }
+
+    Ok(())
+}
+
+fn create_run(matches: ArgMatches, config: &Config) -> UdoRun {
+    let do_as = get_user(
         &matches
             .get_one::<String>("user")
             .cloned()
             .unwrap_or("root".to_string()),
     )
-    .unwrap();
-    if do_as_opt.is_none() {
-        output::error("Target user not found", config.display.nerd);
-        process::exit(1);
-    }
+    .expect("Failed to get do_as user");
+    let user = get_user_by_id(getuid()).expect("Failed to get current user");
 
-    let do_as = do_as_opt.unwrap();
-
-    let user = User::from_uid(getuid()).unwrap().unwrap();
+    let root = match do_as.uid.is_root() {
+        true => &do_as,
+        false => &get_root_user(),
+    };
 
     if user.uid == do_as.uid {
         output::error("Already running as target user", config.display.nerd);
@@ -92,49 +112,33 @@ fn main() -> color_eyre::Result<()> {
         .copied()
         .unwrap_or_default();
 
-    let mut cache = Cache::new(&user, &do_as);
+    let command: Vec<String>;
+    let c_type: CommandType;
 
-    if let Some(("--shell", matches)) = matches.subcommand() {
-        let login = matches.get_one::<bool>("login").copied().unwrap_or(false);
-        let shell = do_as.shell.to_string_lossy().to_string();
-
-        let run = UdoRun {
-            command: vec![shell],
-            c_type: CommandType::Shell(login),
-            clear_cache,
-            preserve_vars,
-            do_as,
-            user,
-        };
-
-        match login_user(&run, &config, &mut cache, config.security.tries) {
-            Ok(_) => {}
-            Err(e) => output::error(
-                format!("Failed to run command, error: {e}"),
-                config.display.nerd,
-            ),
-        }
-        return Ok(());
+    if let Some(("--shell", m)) = matches.subcommand() {
+        let login = m.get_one::<bool>("login").copied().unwrap_or_default();
+        command = vec![do_as.shell.to_string_lossy().to_string()];
+        c_type = CommandType::Shell(login);
+    } else {
+        command = matches
+            .get_many::<String>("command")
+            .unwrap()
+            .cloned()
+            .collect();
+        c_type = CommandType::Command;
     }
 
-    let cmd = matches.get_many::<String>("command");
-    if let Some(cmd_vals) = cmd {
-        let command = cmd_vals.cloned().collect();
+    let cache = Cache::new(&user, root);
 
-        let run = UdoRun {
-            command,
-            c_type: CommandType::Command,
-            clear_cache,
-            preserve_vars,
-            do_as,
-            user,
-        };
-
-        login_user(&run, &config, &mut cache, config.security.tries).unwrap();
-        return Ok(());
+    UdoRun {
+        user,
+        do_as,
+        command,
+        cache,
+        c_type,
+        preserve_vars,
+        clear_cache,
     }
-
-    Ok(())
 }
 
 fn check_perms(config: &Config) -> bool {
@@ -158,18 +162,16 @@ fn check_perms(config: &Config) -> bool {
     valid
 }
 
-fn login_user(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize) -> Result<()> {
-    if run.do_as.uid.is_root() {
-        match cache.check_cache(run, config) {
-            Ok(true) => {
-                after_login(run, config, cache, false)?;
-            }
-            Ok(false) => {}
-            Err(e) => output::error(
-                format!("failed to check cache ({e}). requesting password"),
-                config.display.nerd,
-            ),
+fn login_user(run: &mut UdoRun, config: &Config, tries: usize) -> Result<bool> {
+    match run.cache.check_cache(run.clone(), config) {
+        Ok(true) => {
+            return Ok(true);
         }
+        Ok(false) => {}
+        Err(e) => output::error(
+            format!("failed to check cache ({e}). requesting password"),
+            config.display.nerd,
+        ),
     }
 
     let password = prompt_password(config);
@@ -189,49 +191,45 @@ fn login_user(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize) ->
     );
 
     match auth {
-        Ok(AuthResult::Success) => after_login(run, config, cache, true)?,
+        Ok(AuthResult::Success) => return Ok(true),
         Ok(AuthResult::NotAuthenticated) => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
-                login_user(run, config, cache, tries - 1)?;
+                return login_user(run, config, tries - 1);
             } else {
                 lockout(config);
-                process::exit(0);
+                return Ok(false);
             }
         }
         Ok(AuthResult::NotAuthorised) => {
             not_authenticated(&run.user, config);
+            return Ok(false);
         }
         Ok(AuthResult::AuthenticationFailure(s)) => {
             output::error(
                 format!("Authentication with PAM failed ({s})"),
                 config.display.nerd,
             );
+            return Ok(false);
         }
-        Err(e) => output::error(format!("Error authenticating: {e}"), config.display.nerd),
+        Err(e) => {
+            output::error(format!("Error authenticating: {e}"), config.display.nerd);
+            return Ok(false);
+        }
     }
-
-    Ok(())
 }
 
-fn after_login(
-    udo_run: &UdoRun,
-    config: &Config,
-    cache: &mut Cache,
-    with_pass: bool,
-) -> Result<()> {
+fn after_login(udo_run: &mut UdoRun, config: &Config) -> Result<()> {
     if udo_run.clear_cache {
-        cache.clear().unwrap();
+        udo_run.cache.clear().unwrap();
         output::info(
             format!("Cleared cache for \"{}\" of all entries", udo_run.user.name),
             config.display.nerd,
         );
     }
 
-    if udo_run.do_as.uid.is_root() && with_pass {
-        cache.create_dir()?;
-        cache.cache_run(udo_run)?;
-    }
+    udo_run.cache.create_dir()?;
+    udo_run.cache.cache_run(udo_run.clone())?;
 
     do_run(udo_run)?;
     process::exit(0)

@@ -33,8 +33,8 @@ impl Cache {
         }
     }
 
-    pub fn get_id(run: &UdoRun) -> Result<String> {
-        let uid = run.user.uid;
+    pub fn get_id(user: &User) -> Result<String> {
+        let uid = user.uid;
         let stdin = stdin();
         let stdin_fd = stdin.as_fd();
         let tty_path = ttyname(stdin_fd)?;
@@ -67,12 +67,12 @@ impl Cache {
         Ok(self.dir.clone())
     }
 
-    pub fn cache_run(&mut self, run: &UdoRun) -> Result<()> {
-        let id = Self::get_id(run)?;
+    pub fn cache_run(&mut self, run: UdoRun) -> Result<()> {
+        let id = Self::get_id(&run.user)?;
         let mut f_path = self.dir.clone();
         f_path.push(id);
 
-        let run = CacheEntry::try_from(run)?;
+        let run = CacheEntry::try_from(&run)?;
 
         let mut buf = toml::ser::Buffer::new();
         let se = toml::Serializer::new(&mut buf);
@@ -86,8 +86,8 @@ impl Cache {
         Ok(())
     }
 
-    pub fn check_cache(&mut self, run: &UdoRun, config: &Config) -> Result<bool> {
-        let id = Self::get_id(run)?;
+    pub fn check_cache(&mut self, run: UdoRun, config: &Config) -> Result<bool> {
+        let id = Self::get_id(&run.user)?;
         let mut full = self.dir.clone();
         full.push(id);
 
