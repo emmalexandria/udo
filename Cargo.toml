@@ -3,7 +3,7 @@ name = "udo"
 description = "A modern replacement for sudo/doas"
 authors = ["Emma Alexandria <emma.jellemabutler@gmail.com>"]
 repository = "https://github.com/emmalexandria/udo"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT"
 
