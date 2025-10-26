@@ -24,19 +24,6 @@ pub fn elevate() -> Result<()> {
     Ok(())
 }
 
-pub fn elevate_to(target: &str) -> Result<()> {
-    let user = User::from_name(target)?;
-
-    if let Some(u) = user {
-        setuid(u.uid)?;
-        setgid(u.gid)?;
-    } else {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "target user not found").into());
-    }
-
-    Ok(())
-}
-
 pub fn run<S: ToString>(cmd: &Vec<S>, do_as: &User) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     let cmd_name = &cmd[0];
@@ -54,6 +41,7 @@ pub fn run<S: ToString>(cmd: &Vec<S>, do_as: &User) -> Result<()> {
 }
 
 fn parent(child: Pid) -> Result<()> {
+    println!("Hello");
     match waitpid(child, None) {
         Ok(WaitStatus::Exited(_, status)) => exit(status),
         Ok(WaitStatus::Signaled(_, signal, _)) => exit(128 + signal as i32),
@@ -66,7 +54,7 @@ fn child(cmd_name: &str, args: Vec<&str>, do_as: &User) -> Result<()> {
     let program = CString::new(cmd_name)?;
     let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
 
-    elevate_to(&do_as.name)?;
+    elevate()?;
 
     unsafe {
         clear_env();

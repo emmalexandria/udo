@@ -13,8 +13,6 @@ pub struct SecurityConfig {
     #[serde(default)]
     pub timeout: i64,
     #[serde(default)]
-    pub lockout: i64,
-    #[serde(default)]
     pub tries: usize,
 }
 
@@ -22,7 +20,6 @@ impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
             timeout: 10,
-            lockout: 5,
             tries: 3,
         }
     }

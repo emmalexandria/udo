@@ -10,17 +10,17 @@ use crossterm::{
 };
 use nix::{
     sys::stat::{Mode, stat},
-    unistd::{Uid, User, getuid},
+    unistd::{Uid, User, geteuid, getuid},
 };
 
 use crate::{
     authenticate::{AuthResult, authenticate},
-    cache::{cache_run, check_cache, clear_cache, create_cache_dir},
+    cache::Cache,
     cli::get_cli,
     config::Config,
     elevate::ElevatedContext,
     output::{lockout, prompt::InputPrompt, wrong_password},
-    run::{elevate, elevate_to, run},
+    run::run,
 };
 
 mod authenticate;
@@ -71,10 +71,12 @@ fn main() {
         exit(1);
     }
 
+    println!("{} {}", geteuid(), getuid());
+
+    let mut cache = Cache::new(&user, &do_as);
+
     if let Some(true) = matches.get_one::<bool>("clear") {
-        let mut context = ElevatedContext::new(user.uid, Uid::from_raw(0));
-        context.elevate();
-        clear_cache(&user).unwrap();
+        cache.clear().unwrap();
     }
 
     let cmd = matches.get_many::<String>("command");
@@ -88,7 +90,7 @@ fn main() {
             user,
         };
 
-        check_and_run(&run, &config, config.security.tries);
+        check_and_run(&run, &config, &mut cache, config.security.tries).unwrap();
     }
 }
 
@@ -113,9 +115,9 @@ fn check_perms(config: &Config) -> bool {
     valid
 }
 
-fn check_and_run(run: &UdoRun, config: &Config, tries: usize) -> Result<()> {
-    if run.do_as.uid.is_root() && check_cache(&run.user, config)? {
-        after_auth(run, false)?;
+fn check_and_run(run: &UdoRun, config: &Config, cache: &mut Cache, tries: usize) -> Result<()> {
+    if run.do_as.uid.is_root() && cache.check_cache(run, config)? {
+        after_auth(run, cache, false)?;
         return Ok(());
     }
 
@@ -123,14 +125,14 @@ fn check_and_run(run: &UdoRun, config: &Config, tries: usize) -> Result<()> {
     let auth = authenticate(&run.user, password, config, &run.do_as, &run.command[0]);
 
     match auth {
-        Ok(AuthResult::Success) => after_auth(run, true)?,
+        Ok(AuthResult::Success) => after_auth(run, cache, true)?,
         Ok(AuthResult::NotAuthorised) => {}
         Ok(AuthResult::AuthenticationFailure) => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
-                check_and_run(run, config, tries - 1)?;
+                check_and_run(run, config, cache, tries - 1)?;
             } else {
-                lockout(config.security.lockout);
+                lockout(config);
                 process::exit(0);
             }
         }
@@ -140,12 +142,10 @@ fn check_and_run(run: &UdoRun, config: &Config, tries: usize) -> Result<()> {
     Ok(())
 }
 
-fn after_auth(udo_run: &UdoRun, with_pass: bool) -> Result<()> {
-    let mut context = ElevatedContext::new(udo_run.user.uid, udo_run.do_as.uid);
-    context.elevate()?;
+fn after_auth(udo_run: &UdoRun, cache: &mut Cache, with_pass: bool) -> Result<()> {
     if udo_run.do_as.uid.is_root() && with_pass {
-        create_cache_dir(&udo_run.user.name)?;
-        cache_run(&udo_run.user)?;
+        cache.create_dir(&udo_run.user)?;
+        cache.cache_run(udo_run)?;
     }
 
     run(&udo_run.command, &udo_run.do_as)?;

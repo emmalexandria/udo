@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File, Permissions},
-    io::{Write, stdin},
+    io::{self, Write, stdin},
     os::{
         fd::{AsFd, RawFd},
         unix::fs::PermissionsExt,
@@ -14,101 +14,133 @@ use anyhow::Result;
 use nix::{
     sys::time::TimeValLike,
     time::{ClockId, clock_gettime},
-    unistd::{User, getppid, ttyname},
+    unistd::{Uid, User, getppid, ttyname},
 };
 use serde::{Deserialize, Serialize};
 use toml::Deserializer;
 
-use crate::config::Config;
+use crate::{UdoRun, config::Config, elevate::ElevatedContext};
 
-#[derive(Serialize, Deserialize)]
-struct Cache {
-    timestamp: i64,
+#[derive(Debug, Clone)]
+pub struct Cache {
+    context: ElevatedContext,
+    dir: PathBuf,
 }
 
 impl Cache {
-    pub fn new(timestamp: i64) -> Self {
-        Self { timestamp }
-    }
-}
-
-pub fn get_cache_id(user: &User) -> Result<String> {
-    let uid = user.uid;
-    let stdin = stdin();
-    let stdin_fd = stdin.as_fd();
-    let tty_path = ttyname(stdin_fd)?;
-    let tty = tty_path.file_name().unwrap_or_default().to_string_lossy();
-    let pid = getppid();
-
-    Ok(format!("{uid}-{tty}-{pid}"))
-}
-
-pub fn get_cache_dir(username: &str) -> PathBuf {
-    let mut p = PathBuf::from(CACHE_DIR);
-    p.push(username);
-    p
-}
-
-pub fn create_cache_dir(username: &str) -> Result<PathBuf> {
-    let p = PathBuf::from(CACHE_DIR);
-    let mut full_path = p.clone();
-    full_path.push(username);
-
-    if fs::exists(&full_path)? {
-        let md = fs::metadata(&full_path)?;
-        if md.is_dir() {
-            return Ok(full_path);
+    pub fn new(user: &User, root: &User) -> Self {
+        let dir = Self::get_dir(&user);
+        Self {
+            context: ElevatedContext::new(user.uid, root.uid),
+            dir,
         }
     }
 
-    fs::create_dir_all(&full_path)?;
-    fs::set_permissions(&p, Permissions::from_mode(0o700))?;
-    fs::set_permissions(&full_path, Permissions::from_mode(0o700))?;
+    pub fn get_id(run: &UdoRun) -> Result<String> {
+        let uid = run.user.uid;
+        let stdin = stdin();
+        let stdin_fd = stdin.as_fd();
+        let tty_path = ttyname(stdin_fd)?;
+        let tty = tty_path.file_name().unwrap_or_default().to_string_lossy();
+        let pid = getppid();
 
-    Ok(full_path)
-}
-
-pub fn check_cache(user: &User, config: &Config) -> Result<bool> {
-    let id = get_cache_id(user)?;
-    let mut dir = get_cache_dir(&user.name);
-    dir.push(id);
-
-    let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
-    let content = fs::read_to_string(dir)?;
-
-    let de = Deserializer::parse(&content)?;
-    let cache = Cache::deserialize(de)?;
-
-    let ok = time.num_seconds() - cache.timestamp < config.security.timeout;
-
-    Ok(ok)
-}
-
-pub fn cache_run(user: &User) -> Result<()> {
-    let id = get_cache_id(user)?;
-    let mut dir = get_cache_dir(&user.name);
-    dir.push(id);
-
-    let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
-    let cache = Cache::new(time.num_seconds());
-    let mut buf = toml::ser::Buffer::new();
-    let se = toml::Serializer::new(&mut buf);
-    let out = cache.serialize(se)?;
-
-    let mut file = File::create(dir)?;
-    file.write_all(out.to_string().as_bytes())?;
-
-    Ok(())
-}
-
-pub fn clear_cache(user: &User) -> Result<PathBuf> {
-    let id = get_cache_id(user)?;
-    let mut dir = get_cache_dir(&user.name);
-    dir.push(id);
-
-    if dir.exists() && dir.is_dir() {
-        fs::remove_dir_all(&dir)?;
+        Ok(format!("{uid}-{tty}-{pid}"))
     }
 
-    Ok(dir)
+    pub fn get_dir(user: &User) -> PathBuf {
+        let mut path = PathBuf::from(CACHE_DIR.clone());
+        path.push(&user.name);
+        path
+    }
+
+    pub fn create_dir(&mut self, user: &User) -> Result<PathBuf> {
+        self.context.elevate()?;
+        if fs::exists(&self.dir)? {
+            let md = fs::metadata(&self.dir)?;
+            if md.is_dir() {
+                return Ok(self.dir.clone());
+            }
+        }
+
+        fs::create_dir_all(&self.dir)?;
+        fs::set_permissions(&self.dir, Permissions::from_mode(0o700))?;
+        fs::set_permissions(&self.dir, Permissions::from_mode(0o700))?;
+        self.context.restore()?;
+
+        Ok(self.dir.clone())
+    }
+
+    pub fn cache_run(&mut self, run: &UdoRun) -> Result<()> {
+        let id = Self::get_id(run)?;
+        let mut f_path = self.dir.clone();
+        f_path.push(id);
+
+        let run = CacheEntry::try_from(run)?;
+
+        let mut buf = toml::ser::Buffer::new();
+        let se = toml::Serializer::new(&mut buf);
+        let out = run.serialize(se)?;
+
+        self.context.elevate()?;
+        let mut file = File::create(f_path)?;
+        file.write_all(out.to_string().as_bytes())?;
+        self.context.restore()?;
+
+        Ok(())
+    }
+
+    pub fn check_cache(&mut self, run: &UdoRun, config: &Config) -> Result<bool> {
+        let id = Self::get_id(run)?;
+        let mut full = self.dir.clone();
+        full.push(id);
+
+        let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
+
+        self.context.elevate()?;
+        if !full.exists() || full.is_dir() {
+            return Ok(false);
+        }
+
+        let content = fs::read_to_string(full)?;
+        let de = Deserializer::parse(&content)?;
+        let entry = CacheEntry::deserialize(de)?;
+        self.context.restore()?;
+
+        let time_valid = time.num_seconds() - entry.timestamp < config.security.timeout;
+        let user_valid = entry.uid == run.user.uid.as_raw();
+
+        Ok(time_valid && user_valid)
+    }
+
+    pub fn clear(&mut self) -> Result<()> {
+        self.context.elevate()?;
+
+        if self.dir.exists() && self.dir.is_dir() {
+            fs::remove_dir_all(&self.dir)?;
+        }
+
+        self.context.restore()?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CacheEntry {
+    timestamp: i64,
+    uid: u32,
+}
+
+impl CacheEntry {
+    pub fn new(timestamp: i64, uid: u32) -> Self {
+        Self { timestamp, uid }
+    }
+}
+
+impl TryFrom<&UdoRun> for CacheEntry {
+    type Error = anyhow::Error;
+
+    fn try_from(run: &UdoRun) -> std::result::Result<Self, Self::Error> {
+        let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
+        Ok(CacheEntry::new(time.num_seconds(), run.do_as.uid.as_raw()))
+    }
 }

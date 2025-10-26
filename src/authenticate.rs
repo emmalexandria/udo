@@ -30,6 +30,12 @@ impl From<&String> for ActionValue {
     }
 }
 
+impl From<&str> for ActionValue {
+    fn from(value: &str) -> Self {
+        Self::from(value.to_string())
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Action {
     pub command: ActionValue,
@@ -128,19 +134,8 @@ pub fn authenticate(
     password: String,
     config: &Config,
     do_as: &User,
-    command: &String,
+    command: &str,
 ) -> Result<AuthResult> {
-    let uid = getuid();
-    let user_opt = User::from_uid(uid)?;
-    if user_opt.is_none() {
-        output::error(
-            format!("Failed to get user for uid {}", uid.as_raw()),
-            config.display.nerd,
-        );
-    }
-
-    let user = user_opt.unwrap();
-
     let allowed_actions = get_matching_rules(&user, config)
         .into_iter()
         .map(|r| Action::from_rule(&r, &user))

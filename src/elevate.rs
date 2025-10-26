@@ -1,5 +1,8 @@
 use anyhow::Result;
-use nix::unistd::{Uid, setuid};
+use nix::{
+    libc::setreuid,
+    unistd::{Uid, geteuid, getuid, seteuid, setuid},
+};
 
 #[derive(Debug, Clone)]
 pub struct ElevatedContext {
@@ -19,18 +22,20 @@ impl ElevatedContext {
 
     pub fn elevate(&mut self) -> anyhow::Result<()> {
         if !self.is_elevated {
-            setuid(self.elevated)?;
-            self.is_elevated = !self.is_elevated;
+            seteuid(self.elevated)?;
         }
+
+        self.is_elevated = true;
 
         Ok(())
     }
 
     pub fn restore(&mut self) -> anyhow::Result<()> {
         if self.is_elevated {
-            setuid(self.original)?;
-            self.is_elevated = !self.is_elevated;
+            seteuid(self.original)?;
         }
+
+        self.is_elevated = false;
 
         Ok(())
     }

@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use crossterm::style::{ContentStyle, StyledContent, Stylize};
 
+use crate::config::Config;
+
 pub mod prompt;
 
 fn block(style: &ContentStyle, name: &str, icon: &str) -> MultiStyled<String> {
@@ -49,9 +51,12 @@ pub fn wrong_password(icon: bool, tries: usize) {
     println!("{block} Incorrect. {tries} {try_text} remaining.")
 }
 
-pub fn lockout(lockout: i64) {
-    let lock = format!("{} minutes", lockout).stylize().yellow().bold();
-    println!("Max number of attempts reached. Locked out for {lock}.")
+pub fn lockout(config: &Config) {
+    let lock = format!("{} incorrect password attempts", config.security.tries)
+        .stylize()
+        .yellow()
+        .bold();
+    println!("{lock}");
 }
 
 #[derive(Default, Debug, Clone)]
