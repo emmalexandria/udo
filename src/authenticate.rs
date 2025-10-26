@@ -153,7 +153,13 @@ pub fn authenticate(
 
     if matching.is_some() {
         let auth = authenticate_user(&user.name, &password, "udo");
-        if auth.is_err() || auth.is_ok_and(|v| !v) {
+        match auth {
+            Ok(false) => return Ok(AuthResult::AuthenticationFailure),
+            Err(e) => return Err(e),
+            _ => {}
+        }
+
+        if auth.is_ok_and(|v| !v) {
             return Ok(AuthResult::AuthenticationFailure);
         }
     } else {

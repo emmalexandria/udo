@@ -1,5 +1,7 @@
+use std::error::Error;
 use std::ffi::c_void;
 use std::ffi::{CString, c_char, c_int};
+use std::fmt::Display;
 use std::ptr;
 
 use anyhow::Result;
@@ -15,7 +17,36 @@ const PROMPT_ECHO_ON: c_int = 2;
 const ERR_MSG: c_int = 3;
 const TEXT_INFO: c_int = 4;
 
-pub enum PamResult {}
+#[derive(Debug, Clone)]
+pub enum AuthErrorKind {
+    InvalidInput,
+    StartFailure,
+    AuthenticateFailure,
+    ValidationFailure,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthError {
+    kind: AuthErrorKind,
+    message: String,
+}
+
+impl Error for AuthError {}
+
+impl Display for AuthError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl AuthError {
+    pub fn new<S: ToString>(kind: AuthErrorKind, message: S) -> Self {
+        Self {
+            kind,
+            message: message.to_string(),
+        }
+    }
+}
 
 extern "C" fn pam_conversation(
     num_msg: c_int,
@@ -86,14 +117,17 @@ extern "C" fn pam_conversation(
 }
 
 /// Authenticate a user with PAM
-pub fn authenticate_user(username: &str, password: &str, service: &str) -> Result<bool, String> {
+pub fn authenticate_user(username: &str, password: &str, service: &str) -> Result<bool> {
     unsafe {
         let mut pamh: *mut PamHandle = ptr::null_mut();
 
         // Convert strings to C strings
-        let c_username = CString::new(username).map_err(|e| format!("Invalid username: {}", e))?;
-        let c_password = CString::new(password).map_err(|e| format!("Invalid password: {}", e))?;
-        let c_service = CString::new(service).map_err(|e| format!("Invalid service: {}", e))?;
+        let c_username = CString::new(username)
+            .map_err(|e| AuthError::new(AuthErrorKind::InvalidInput, "invalid username"))?;
+        let c_password = CString::new(password)
+            .map_err(|e| AuthError::new(AuthErrorKind::InvalidInput, "invalid password"))?;
+        let c_service = CString::new(service)
+            .map_err(|e| AuthError::new(AuthErrorKind::InvalidInput, "invalid service"))?;
 
         // Setup PAM conversation structure
         let conv = PamConversation {
@@ -110,35 +144,49 @@ pub fn authenticate_user(username: &str, password: &str, service: &str) -> Resul
         );
 
         if ret != PamReturnCode::SUCCESS {
-            return Err(format!(
-                "pam_start failed: {}",
-                get_pam_error(&mut *pamh, ret)
-            ));
+            return Err(AuthError::new(
+                AuthErrorKind::StartFailure,
+                format!(
+                    "pam_start failed: {} {}",
+                    get_pam_error(&mut *pamh, ret),
+                    ret
+                ),
+            )
+            .into());
         }
 
-        let rhost = CString::new("localhost").unwrap();
-        let rhost_raw = rhost.as_ptr() as *const c_void;
-        set_item(&mut *pamh, PamItemType::RHOST, &*rhost_raw);
-
+        // let rhost = CString::new("localhost").unwrap();
+        // let rhost_raw = rhost.as_ptr() as *const c_void;
+        // set_item(&mut *pamh, PamItemType::RHOST, &*rhost_raw);
+        //
         // Authenticate the user
         ret = authenticate(&mut *pamh, PamFlag::NONE);
         if ret != PamReturnCode::SUCCESS {
             end(&mut *pamh, ret);
-            return Err(format!(
-                "Authentication failed: {}, {}",
-                get_pam_error(&mut *pamh, ret),
-                ret
-            ));
+            return Err(AuthError::new(
+                AuthErrorKind::AuthenticateFailure,
+                format!(
+                    "Authentication failed: {}, {}",
+                    get_pam_error(&mut *pamh, ret),
+                    ret
+                ),
+            )
+            .into());
         }
 
         // Validate account (check if account is valid, not expired, etc.)
         ret = acct_mgmt(&mut *pamh, PamFlag::NONE);
         if ret != PamReturnCode::SUCCESS {
             end(&mut *pamh, ret);
-            return Err(format!(
-                "Account validation failed: {}",
-                get_pam_error(&mut *pamh, ret)
-            ));
+            return Err(AuthError::new(
+                AuthErrorKind::ValidationFailure,
+                format!(
+                    "Account validation failed: {} {}",
+                    get_pam_error(&mut *pamh, ret),
+                    ret
+                ),
+            )
+            .into());
         }
 
         // Clean up
