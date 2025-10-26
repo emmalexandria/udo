@@ -4,7 +4,6 @@ use std::ffi::{CString, c_char, c_int};
 use std::fmt::Display;
 use std::ptr;
 
-use anyhow::Result;
 use nix::libc;
 use pam_sys::{PamConversation, PamHandle, PamMessage, PamResponse, wrapped::start};
 use pam_sys::{PamFlag, PamItemType, PamReturnCode, wrapped::*};
@@ -17,7 +16,7 @@ const PROMPT_ECHO_ON: c_int = 2;
 const ERR_MSG: c_int = 3;
 const TEXT_INFO: c_int = 4;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthErrorKind {
     InvalidInput,
     StartFailure,
@@ -27,8 +26,8 @@ pub enum AuthErrorKind {
 
 #[derive(Debug, Clone)]
 pub struct AuthError {
-    kind: AuthErrorKind,
-    message: String,
+    pub kind: AuthErrorKind,
+    pub message: String,
 }
 
 impl Error for AuthError {}
@@ -117,7 +116,7 @@ extern "C" fn pam_conversation(
 }
 
 /// Authenticate a user with PAM
-pub fn authenticate_user(username: &str, password: &str, service: &str) -> Result<bool> {
+pub fn authenticate_user(username: &str, password: &str, service: &str) -> Result<bool, AuthError> {
     unsafe {
         let mut pamh: *mut PamHandle = ptr::null_mut();
 
@@ -203,4 +202,28 @@ fn get_pam_error(pamh: &mut PamHandle, error_code: PamReturnCode) -> String {
         return format!("Unknown error (code: {})", error_code);
     }
     error_cstr.unwrap().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use nix::unistd::{geteuid, getuid};
+
+    use crate::authenticate::pam::{AuthError, AuthErrorKind, authenticate_user};
+
+    #[test]
+    fn test_incorrect_password() {
+        let invalid = authenticate_user("root", "thisbetternotbeyourrootpassword1234", "udo");
+
+        assert!(invalid.err().unwrap().kind == AuthErrorKind::AuthenticateFailure)
+    }
+
+    #[test]
+    fn test_correct_login() {
+        println!("{}", geteuid());
+        let invalid = authenticate_user("thisuserbetternotexistonyoursystem", "hello", "udo");
+
+        assert!(invalid.err().unwrap().kind == AuthErrorKind::ValidationFailure)
+    }
 }

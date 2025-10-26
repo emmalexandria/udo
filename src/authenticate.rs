@@ -155,7 +155,7 @@ pub fn authenticate(
         let auth = authenticate_user(&user.name, &password, "udo");
         match auth {
             Ok(false) => return Ok(AuthResult::AuthenticationFailure),
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
             _ => {}
         }
 

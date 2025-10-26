@@ -21,6 +21,3 @@ nix = { version = "0.30.1", features = [
 pam-sys = "0.5.6"
 serde = { version = "1.0.228", features = ["derive"] }
 toml = "0.9.8"
-
-[target.'cfg(target_platform = "unix")']
-runner = 'sudo -E'
