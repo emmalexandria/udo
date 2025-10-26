@@ -1,5 +1,6 @@
 use std::{
     env,
+    ffi::OsStr,
     process::{self, exit},
 };
 
@@ -19,7 +20,7 @@ use crate::{
     cli::get_cli,
     config::Config,
     output::{lockout, prompt::InputPrompt, wrong_password},
-    run::process::run_process,
+    run::{process::run_process, shell::get_shell_cmd},
 };
 
 mod authenticate;
@@ -73,6 +74,22 @@ fn main() {
     let mut cache = Cache::new(&user, &do_as);
     if let Some(true) = matches.get_one::<bool>("clear") {
         cache.clear().unwrap();
+    }
+
+    if let Some(("--shell", matches)) = matches.subcommand() {
+        let shell = get_shell_cmd(&user)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or("sh".to_string());
+
+        let run = UdoRun {
+            command: vec![shell],
+            do_as,
+            user,
+        };
+
+        check_and_run(&run, &config, &mut cache, config.security.tries).unwrap();
+        return;
     }
 
     let cmd = matches.get_many::<String>("command");
