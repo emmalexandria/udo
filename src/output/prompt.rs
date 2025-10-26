@@ -16,13 +16,15 @@ use crate::output::MultiStyled;
 pub struct InputPrompt {
     prompt: Option<MultiStyled<String>>,
     obscure: bool,
+    display_pw: bool,
 }
 
 impl Default for InputPrompt {
     fn default() -> Self {
         Self {
             prompt: None,
-            obscure: false,
+            obscure: true,
+            display_pw: true,
         }
     }
 }
@@ -43,6 +45,11 @@ impl InputPrompt {
         self
     }
 
+    pub fn display_pw(mut self, yes: bool) -> Self {
+        self.display_pw = yes;
+        self
+    }
+
     pub fn run(&self) -> io::Result<String> {
         let mut content = String::new();
         let mut running = true;
@@ -55,10 +62,10 @@ impl InputPrompt {
                 print!("{p} ")
             }
 
-            if self.obscure {
+            if self.obscure && self.display_pw {
                 let obscured: String = (0..content.len()).map(|_| '•').collect();
                 print!("{obscured}");
-            } else {
+            } else if self.display_pw {
                 print!("{content}");
             }
 

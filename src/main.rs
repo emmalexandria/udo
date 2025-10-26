@@ -152,7 +152,8 @@ fn prompt_password(config: &Config) -> String {
     enable_raw_mode().unwrap();
     let prompt = InputPrompt::default()
         .password_prompt()
-        .obscure(config.display.censor);
+        .obscure(config.display.censor)
+        .display_pw(config.display.display_pw);
 
     let res = prompt.run().unwrap();
 

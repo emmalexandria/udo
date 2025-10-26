@@ -15,14 +15,7 @@ use nix::{
     unistd::{ForkResult, Gid, Pid, Uid, User, execvp, fork, setgid, setuid},
 };
 
-use crate::config::Config;
-
-pub fn elevate() -> Result<()> {
-    setuid(Uid::from_raw(0))?;
-    setgid(Gid::from_raw(0))?;
-
-    Ok(())
-}
+use crate::{config::Config, elevate::elevate_final};
 
 pub fn run<S: ToString>(cmd: &Vec<S>, do_as: &User) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
@@ -53,7 +46,7 @@ fn child(cmd_name: &str, args: Vec<&str>, do_as: &User) -> Result<()> {
     let program = CString::new(cmd_name)?;
     let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
 
-    elevate()?;
+    elevate_final(do_as.uid)?;
 
     unsafe {
         clear_env();

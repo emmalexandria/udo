@@ -48,3 +48,7 @@ impl Drop for ElevatedContext {
         let _ = self.restore();
     }
 }
+
+pub fn elevate_final(uid: Uid) -> Result<()> {
+    Ok(setuid(uid)?)
+}
