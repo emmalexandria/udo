@@ -7,7 +7,7 @@ use nix::{
 
 use anyhow::Result;
 
-use crate::CommandType;
+use crate::{CommandType, UdoRun};
 
 pub struct Vars {
     pub home: String,
@@ -33,6 +33,7 @@ impl Vars {
 
 pub struct Env {
     pub command_type: CommandType,
+    preserve_all: bool,
     safe_vars: Vec<String>,
     set_vars: Vars,
     do_as: User,
@@ -52,43 +53,47 @@ impl Env {
     // These vars are always preserved
     const PRESERVE_VARS: [&str; 2] = ["TERM", "DISPLAY"];
 
-    pub fn shell_env(do_as: &User, login: bool) -> Self {
-        match login {
-            true => Self::login_env(do_as),
-            false => Self::non_login_env(do_as),
+    pub fn shell_env(run: &UdoRun) -> Self {
+        match run.c_type {
+            CommandType::Shell(true) => Self::login_env(&run),
+            CommandType::Shell(false) => Self::non_login_env(&run),
+            CommandType::Command => Self::non_login_env(&run),
         }
     }
 
-    fn login_env(do_as: &User) -> Self {
+    fn login_env(run: &UdoRun) -> Self {
         let safe_vars = Self::const_vars_to_vec(&Self::PRESERVE_VARS);
         Self {
             command_type: CommandType::Shell(true),
             safe_vars,
-            set_vars: Vars::from_user(do_as),
-            do_as: do_as.clone(),
+            preserve_all: run.preserve_vars,
+            set_vars: Vars::from_user(&run.do_as),
+            do_as: run.do_as.clone(),
         }
     }
 
-    fn non_login_env(do_as: &User) -> Self {
+    fn non_login_env(run: &UdoRun) -> Self {
         let mut safe_vars = Self::const_vars_to_vec(&Self::SAFE_VARS);
         safe_vars.append(&mut Self::const_vars_to_vec(&Self::PRESERVE_VARS));
 
         Self {
             command_type: CommandType::Shell(false),
             safe_vars,
-            set_vars: Vars::from_user(do_as),
-            do_as: do_as.clone(),
+            preserve_all: run.preserve_vars,
+            set_vars: Vars::from_user(&run.do_as),
+            do_as: run.do_as.clone(),
         }
     }
 
-    pub fn process_env(do_as: &User) -> Self {
+    pub fn process_env(run: &UdoRun) -> Self {
         let mut safe_vars = Self::const_vars_to_vec(&Self::SAFE_VARS);
         safe_vars.append(&mut Self::const_vars_to_vec(&Self::PRESERVE_VARS));
         Self {
             command_type: CommandType::Command,
             safe_vars,
-            set_vars: Vars::from_user(do_as),
-            do_as: do_as.clone(),
+            preserve_all: run.preserve_vars,
+            set_vars: Vars::from_user(&run.do_as),
+            do_as: run.do_as.clone(),
         }
     }
 
@@ -110,9 +115,11 @@ impl Env {
         let vars = env::vars();
 
         unsafe {
-            for (var, _) in vars {
-                if !self.is_var_valid(&var) {
-                    env::remove_var(var);
+            if !self.preserve_all {
+                for (var, _) in vars {
+                    if !self.is_var_valid(&var) {
+                        env::remove_var(var);
+                    }
                 }
             }
 

@@ -13,6 +13,13 @@ pub fn get_cli() -> Command {
                 .required_unless_present_any(["clear"]),
         )
         .arg(
+            Arg::new("preserve")
+                .short('e')
+                .long("preserve-env")
+                .action(ArgAction::SetTrue)
+                .help("Preserve environment variables"),
+        )
+        .arg(
             Arg::new("nocheck")
                 .help("Skips validating the permissions and owner of udo")
                 .short('n')

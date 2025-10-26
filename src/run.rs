@@ -13,7 +13,7 @@ pub fn do_run(run: &UdoRun) -> Result<()> {
 }
 
 fn process(run: &UdoRun) -> Result<()> {
-    let env = Env::process_env(&run.do_as);
+    let env = Env::process_env(&run);
 
     Ok(())
 }

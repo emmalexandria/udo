@@ -40,11 +40,14 @@ pub enum CommandType {
 struct UdoRun {
     pub command: Vec<String>,
     pub c_type: CommandType,
+    pub preserve_vars: bool,
     pub user: User,
     pub do_as: User,
 }
 
-fn main() {
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
     let cli = get_cli();
     let matches = cli.get_matches();
     let config = Config::read().unwrap();
@@ -87,13 +90,19 @@ fn main() {
         );
     }
 
+    let preserve_vars = matches
+        .get_one::<bool>("preserve")
+        .copied()
+        .unwrap_or_default();
+
     if let Some(("--shell", matches)) = matches.subcommand() {
         let login = matches.get_one::<bool>("login").copied().unwrap_or(false);
-        let mut shell = get_shell_cmd(&user).to_string_lossy().to_string();
+        let shell = get_shell_cmd(&user).to_string_lossy().to_string();
 
         let run = UdoRun {
             command: vec![shell],
             c_type: CommandType::Shell(login),
+            preserve_vars,
             do_as,
             user,
         };
@@ -105,7 +114,7 @@ fn main() {
                 config.display.nerd,
             ),
         }
-        return;
+        return Ok(());
     }
 
     let cmd = matches.get_many::<String>("command");
@@ -115,12 +124,16 @@ fn main() {
         let run = UdoRun {
             command,
             c_type: CommandType::Command,
+            preserve_vars,
             do_as,
             user,
         };
 
         check_and_run(&run, &config, &mut cache, config.security.tries).unwrap();
+        return Ok(());
     }
+
+    Ok(())
 }
 
 fn check_perms(config: &Config) -> bool {
@@ -194,8 +207,8 @@ fn after_auth(udo_run: &UdoRun, cache: &mut Cache, with_pass: bool) -> Result<()
     }
 
     let env = match udo_run.c_type {
-        CommandType::Command => Env::process_env(&udo_run.do_as),
-        CommandType::Shell(l) => Env::shell_env(&udo_run.do_as, l),
+        CommandType::Command => Env::process_env(&udo_run),
+        CommandType::Shell(l) => Env::shell_env(&udo_run),
     };
 
     run_process(&udo_run.command, &env)?;
