@@ -5,10 +5,7 @@ use std::{
 
 use anyhow::Result;
 use clap::ArgMatches;
-use crossterm::{
-    style::force_color_output,
-    terminal::{disable_raw_mode, enable_raw_mode},
-};
+use crossterm::style::force_color_output;
 use nix::{
     sys::stat::{Mode, stat},
     unistd::{Uid, User, getuid},
@@ -191,30 +188,30 @@ fn login_user(run: &mut UdoRun, config: &Config, tries: usize) -> Result<bool> {
     );
 
     match auth {
-        Ok(AuthResult::Success) => return Ok(true),
+        Ok(AuthResult::Success) => Ok(true),
         Ok(AuthResult::NotAuthenticated) => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
-                return login_user(run, config, tries - 1);
+                login_user(run, config, tries - 1)
             } else {
                 lockout(config);
-                return Ok(false);
+                Ok(false)
             }
         }
         Ok(AuthResult::NotAuthorised) => {
             not_authenticated(&run.user, config);
-            return Ok(false);
+            Ok(false)
         }
         Ok(AuthResult::AuthenticationFailure(s)) => {
             output::error(
                 format!("Authentication with PAM failed ({s})"),
                 config.display.nerd,
             );
-            return Ok(false);
+            Ok(false)
         }
         Err(e) => {
             output::error(format!("Error authenticating: {e}"), config.display.nerd);
-            return Ok(false);
+            Ok(false)
         }
     }
 }
