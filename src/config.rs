@@ -12,10 +12,9 @@ use crate::{
 const CONFIG_PATH: &str = "/etc/udo/config.toml";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(default)]
 pub struct SecurityConfig {
-    #[serde(default)]
     pub timeout: i64,
-    #[serde(default)]
     pub tries: usize,
 }
 
@@ -29,18 +28,13 @@ impl Default for SecurityConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(default)]
 pub struct DisplayConfig {
-    #[serde(default)]
     pub color: bool,
-    #[serde(default)]
     pub unicode: bool,
-    #[serde(default)]
     pub nerd: bool,
-    #[serde(default)]
     pub censor: bool,
-    #[serde(default)]
     pub display_pw: bool,
-    #[serde(default)]
     pub theme: Theme,
 }
 
@@ -58,12 +52,10 @@ impl Default for DisplayConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default)]
 pub struct Config {
-    #[serde(default)]
     pub display: DisplayConfig,
-    #[serde(default)]
     pub rules: Vec<Rule>,
-    #[serde(default)]
     pub security: SecurityConfig,
 }
 

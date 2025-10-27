@@ -55,6 +55,10 @@ fn main() {
         Ok(c) => c,
         Err(e) => {
             output::error_with_details("Config error", e, false);
+            println!("In future, please consider using udoedit");
+            println!(
+                "Use sudo/doas to fix the config file, or chroot into your system from a live system."
+            );
             exit(1)
         }
     };

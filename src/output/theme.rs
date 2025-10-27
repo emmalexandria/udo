@@ -11,6 +11,7 @@ pub enum PromptStyle {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Theme {
     replace_char: char,
     prompt_color: Color,
