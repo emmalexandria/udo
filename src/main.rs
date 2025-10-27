@@ -1,25 +1,11 @@
-use std::{
-    collections::HashMap,
-    env,
-    process::{self, exit},
-};
+use std::process::exit;
 
-use anyhow::Result;
-use clap::ArgMatches;
 use crossterm::style::force_color_output;
-use nix::{
-    sys::stat::{Mode, stat},
-    unistd::{Uid, User, getuid},
-};
 
 use crate::{
-    authenticate::{AuthResult, authenticate_password, check_action_auth},
-    cache::Cache,
     cli::get_cli,
     config::Config,
-    output::{lockout, not_authenticated, prompt_password, wrong_password},
     run::Run,
-    user::{get_root_user, get_user, get_user_by_id},
 };
 
 mod authenticate;

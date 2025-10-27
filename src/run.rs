@@ -161,7 +161,7 @@ impl<'a> Run<'a> {
         let do_as_arg = matches
             .get_one::<String>("user")
             .expect("No user specified. This should not happen! Please file a bug report");
-        let do_as = match get_user(&do_as_arg) {
+        let do_as = match get_user(do_as_arg) {
             Some(u) => u,
             None => return Err(Error::new(ErrorKind::NoUser, "Couldn't get target user")),
         };
@@ -300,7 +300,7 @@ impl<'a> Run<'a> {
     }
 
     fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
-        if !self.do_as.uid.is_root() {}
+        !self.do_as.uid.is_root();
 
         for action in login {
             let res = action.do_action(self, self.config);

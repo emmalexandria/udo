@@ -179,7 +179,7 @@ pub fn check_action_auth(run: &Run, config: &Config) -> bool {
     let applicable_rules = get_matching_rules(&run.user, config);
     let allowed_actions = applicable_rules
         .iter()
-        .map(|r| Action::from_rule(r))
+        .map(Action::from_rule)
         .collect::<Vec<_>>();
 
     // Get the current hostname. If we can't get it, only allow the action to proceed if there is
@@ -189,8 +189,7 @@ pub fn check_action_auth(run: &Run, config: &Config) -> bool {
     if hostname.is_none()
         && allowed_actions
             .iter()
-            .find(|a| !matches!(a.host, Some(ActionValue::Any)))
-            .is_some()
+            .any(|a| !matches!(a.host, Some(ActionValue::Any)))
     {
         return false;
     }
@@ -208,7 +207,7 @@ pub fn check_action_auth(run: &Run, config: &Config) -> bool {
         .filter(|a| a.contains(&action))
         .collect::<Vec<_>>();
 
-    matching_actions.len() > 0
+    !matching_actions.is_empty()
 }
 
 /// Get the rules which apply to the current user
