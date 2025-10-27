@@ -5,6 +5,7 @@ use crate::{
     cache::Cache,
     config::Config,
     output::{self, lockout, prompt_password, wrong_password},
+    run::{env::Env, process::run_process},
     user::{get_root_user, get_user, get_user_by_id},
 };
 use clap::ArgMatches;
@@ -100,7 +101,11 @@ impl Action {
             ActionType::ClearCache => run.cache.clear(),
             ActionType::Login => todo!(),
             ActionType::Shell => todo!(),
-            ActionType::RunCommand => todo!(),
+            ActionType::RunCommand => {
+                let env = Env::process_env(run, run.config.security.safe_path.as_ref());
+                run_process(&run.command.clone().unwrap(), &env)?;
+                Ok(())
+            }
         }
     }
 }
@@ -167,12 +172,13 @@ impl<'a> Run<'a> {
 
         let cache = Cache::new(&user, &root);
 
-        let actions = Self::get_actions(matches);
+        let mut actions = Self::get_actions(matches);
         let flags = Self::get_flags(matches);
         let mut command = None;
 
         if let Some(cmd) = matches.get_many::<String>("command") {
             command = Some(cmd.cloned().collect::<Vec<_>>());
+            actions.push(Action::new(ActionType::RunCommand, ActionReqs::auth()));
         }
 
         Ok(Self {
