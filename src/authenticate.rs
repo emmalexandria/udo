@@ -12,6 +12,7 @@ use crate::{
     config::Config,
 };
 
+/// ActionValue represents a value within [Action]. It can either be Any, or a specific Value.
 #[derive(Debug, Clone, Default)]
 pub enum ActionValue {
     #[default]
@@ -40,6 +41,10 @@ impl From<&str> for ActionValue {
     }
 }
 
+/// Action is the internal representation of a [Rule]. It represents the commands the user is
+/// allowed to run, the hostname they can run them as, and the user they can run them as
+///
+/// It is composed of [ActionValue]
 #[derive(Debug, Clone, Default)]
 pub struct Action {
     pub command: ActionValue,
@@ -106,6 +111,7 @@ pub enum AuthResult {
     Success,
 }
 
+/// Rule is used in the configuration file, which is why it is a distinct type from [Action].
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Rule {
     target: String,
@@ -124,7 +130,8 @@ impl Rule {
         }
     }
 
-    pub fn check_authorization(&self, user: &User) -> Result<bool> {
+    /// Checks if the rule applies to the current user
+    pub fn applies_to(&self, user: &User) -> Result<bool> {
         if self.target == user.name {
             return Ok(true);
         }
@@ -148,6 +155,7 @@ impl Rule {
     }
 }
 
+/// Attempts to authenticate the user with the given password
 pub fn authenticate_password(run: &UdoRun, config: &Config, password: String) -> AuthResult {
     match authenticate_user(&run.user.name, &password, "udo") {
         Ok(_) => AuthResult::Success,
@@ -162,6 +170,10 @@ pub fn authenticate_password(run: &UdoRun, config: &Config, password: String) ->
     }
 }
 
+/// Check if the user is allowed to run the action they are trying to
+///
+/// If the hostname cannot be retrieved, it will allow the action only if
+/// there is a [Rule] with hostname ANY
 pub fn check_action_auth(run: &UdoRun, config: &Config) -> bool {
     // Get the rules the user is authorised to run
     let applicable_rules = get_matching_rules(&run.user, config);
@@ -190,6 +202,7 @@ pub fn check_action_auth(run: &UdoRun, config: &Config) -> bool {
         do_as: ActionValue::from(run.do_as.name.clone()),
     };
 
+    // Filter the allowed actions for ones which contain the action the user is attempting
     let matching_actions = allowed_actions
         .iter()
         .filter(|a| a.contains(&action))
@@ -198,11 +211,12 @@ pub fn check_action_auth(run: &UdoRun, config: &Config) -> bool {
     matching_actions.len() > 0
 }
 
+/// Get the rules which apply to the current user
 fn get_matching_rules(user: &User, config: &Config) -> Vec<Rule> {
     config
         .rules
         .iter()
-        .filter(|&r| r.check_authorization(user).is_ok_and(|v| v))
+        .filter(|&r| r.applies_to(user).is_ok_and(|v| v))
         .cloned()
         .collect()
 }
