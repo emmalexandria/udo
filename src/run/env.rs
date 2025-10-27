@@ -4,26 +4,41 @@ use nix::unistd::{User, setuid};
 
 use anyhow::Result;
 
-use crate::{CommandType, UdoRun};
+use crate::{CommandType, UdoRun, config::Config};
 
 pub struct Vars {
     pub home: String,
     pub user: String,
     pub logname: String,
     pub shell: String,
-    pub path: String,
+    pub path: Option<String>,
 }
 
 impl Vars {
-    const SAFE_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    pub fn from_run(run: &UdoRun, path: Option<&String>) -> Self {
+        match run.c_type {
+            CommandType::Command | CommandType::Shell(false) => Self::non_login(run, path.cloned()),
+            CommandType::Shell(true) => Self::login(run, path.cloned()),
+        }
+    }
 
-    pub fn from_user(user: &User, shell: String) -> Self {
+    fn non_login(run: &UdoRun, path: Option<String>) -> Self {
         Self {
-            home: user.dir.to_string_lossy().to_string(),
-            user: user.name.clone(),
-            logname: user.name.clone(),
-            shell,
-            path: Self::SAFE_PATH.to_string(),
+            home: run.user.dir.to_string_lossy().to_string(),
+            user: run.do_as.name.clone(),
+            logname: run.do_as.name.clone(),
+            shell: run.user.shell.to_string_lossy().to_string(),
+            path,
+        }
+    }
+
+    fn login(run: &UdoRun, path: Option<String>) -> Self {
+        Self {
+            home: run.do_as.dir.to_string_lossy().to_string(),
+            user: run.do_as.name.clone(),
+            logname: run.do_as.name.clone(),
+            shell: run.do_as.shell.to_string_lossy().to_string(),
+            path,
         }
     }
 }
@@ -50,26 +65,27 @@ impl Env {
     // These vars are always preserved
     const PRESERVE_VARS: [&str; 2] = ["TERM", "DISPLAY"];
 
-    pub fn shell_env(run: &UdoRun) -> Self {
+    pub fn shell_env(run: &UdoRun, path: Option<&String>) -> Self {
+        let path = path.clone();
         match run.c_type {
-            CommandType::Shell(true) => Self::login_env(run),
-            CommandType::Shell(false) => Self::non_login_env(run),
-            CommandType::Command => Self::non_login_env(run),
+            CommandType::Shell(true) => Self::login_env(run, path),
+            CommandType::Shell(false) => Self::non_login_env(run, path),
+            CommandType::Command => Self::non_login_env(run, path),
         }
     }
 
-    fn login_env(run: &UdoRun) -> Self {
+    fn login_env(run: &UdoRun, path: Option<&String>) -> Self {
         let safe_vars = Self::const_vars_to_vec(&Self::PRESERVE_VARS);
         Self {
             command_type: CommandType::Shell(true),
             safe_vars,
             preserve_all: run.preserve_vars,
-            set_vars: Vars::from_user(&run.do_as, Self::get_shell(run)),
+            set_vars: Vars::from_run(run, path),
             do_as: run.do_as.clone(),
         }
     }
 
-    fn non_login_env(run: &UdoRun) -> Self {
+    fn non_login_env(run: &UdoRun, path: Option<&String>) -> Self {
         let mut safe_vars = Self::const_vars_to_vec(&Self::SAFE_VARS);
         safe_vars.append(&mut Self::const_vars_to_vec(&Self::PRESERVE_VARS));
 
@@ -77,7 +93,7 @@ impl Env {
             command_type: CommandType::Shell(false),
             safe_vars,
             preserve_all: run.preserve_vars,
-            set_vars: Vars::from_user(&run.do_as, Self::get_shell(run)),
+            set_vars: Vars::from_run(run, path),
             do_as: run.do_as.clone(),
         }
     }
@@ -91,14 +107,14 @@ impl Env {
         }
     }
 
-    pub fn process_env(run: &UdoRun) -> Self {
+    pub fn process_env(run: &UdoRun, path: Option<&String>) -> Self {
         let mut safe_vars = Self::const_vars_to_vec(&Self::SAFE_VARS);
         safe_vars.append(&mut Self::const_vars_to_vec(&Self::PRESERVE_VARS));
         Self {
             command_type: CommandType::Command,
             safe_vars,
             preserve_all: run.preserve_vars,
-            set_vars: Vars::from_user(&run.do_as, Self::get_shell(run)),
+            set_vars: Vars::from_run(run, path),
             do_as: run.do_as.clone(),
         }
     }
@@ -133,7 +149,9 @@ impl Env {
                 }
             }
 
-            env::set_var("PATH", &self.set_vars.path);
+            if let Some(p) = &self.set_vars.path {
+                env::set_var("PATH", p);
+            }
             env::set_var("HOME", &self.set_vars.home);
             env::set_var("SHELL", &self.set_vars.shell);
             env::set_var("USER", &self.set_vars.user);

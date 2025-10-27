@@ -14,6 +14,7 @@ const CONFIG_PATH: &str = "/etc/udo/config.toml";
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct SecurityConfig {
+    pub safe_path: Option<String>,
     pub timeout: i64,
     pub tries: usize,
 }
@@ -21,6 +22,7 @@ pub struct SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
+            safe_path: None,
             timeout: 10,
             tries: 3,
         }

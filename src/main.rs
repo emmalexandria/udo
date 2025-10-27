@@ -237,6 +237,6 @@ fn after_login(udo_run: &mut UdoRun, config: &Config) -> Result<()> {
     udo_run.cache.create_dir()?;
     udo_run.cache.cache_run(udo_run.clone())?;
 
-    do_run(udo_run)?;
+    do_run(udo_run, config)?;
     process::exit(0)
 }
