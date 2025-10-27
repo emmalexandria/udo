@@ -7,6 +7,7 @@ use nix::unistd::{Group, User, gethostname};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    UdoRun,
     authenticate::pam::{AuthErrorKind, authenticate_user},
     config::Config,
 };
@@ -42,16 +43,16 @@ impl From<&str> for ActionValue {
 #[derive(Debug, Clone, Default)]
 pub struct Action {
     pub command: ActionValue,
-    pub host: ActionValue,
-    pub run_as: ActionValue,
+    pub host: Option<ActionValue>,
+    pub do_as: ActionValue,
 }
 
 impl Action {
-    fn from_rule(rule: &Rule, user: &User) -> Self {
+    fn from_rule(rule: &Rule) -> Self {
         Self {
             command: (&rule.command).into(),
-            host: (&rule.host).into(),
-            run_as: (&rule.user).into(),
+            host: Some((&rule.host).into()),
+            do_as: (&rule.user).into(),
         }
     }
 
@@ -64,19 +65,34 @@ impl Action {
             }
         };
 
-        let host = match &self.host {
-            ActionValue::Any => true,
-            ActionValue::Value(v) => {
-                let v = v.clone();
-                matches!(&other.host, ActionValue::Value(v))
+        // Because getting the hostname is a fallible operation, we support cases where we couldn't get the hostname
+        let host;
+        // If we couldn't get the hostname then
+        if other.host.is_none() {
+            host = match self.host {
+                // If this hostname is any, we allow it
+                Some(ActionValue::Any) => true,
+                // Otherwise we don't
+                None | Some(ActionValue::Value(_)) => false,
             }
-        };
+        } else {
+            // If we could get the hostname then
+            let h = other.host.as_ref().unwrap();
+            host = match &self.host {
+                // Check if this action allows any
+                Some(ActionValue::Any) => true,
+                // Check if this action's hostname allows others
+                Some(h) => true,
+                // If this action has no hostname (shouldn't happen!) don't allow
+                None => false,
+            };
+        }
 
-        let run_as = match &self.run_as {
+        let run_as = match &self.do_as {
             ActionValue::Any => true,
             ActionValue::Value(v) => {
                 let v = v.clone();
-                matches!(&other.run_as, ActionValue::Value(v))
+                matches!(&other.do_as, ActionValue::Value(v))
             }
         };
 
@@ -85,7 +101,6 @@ impl Action {
 }
 
 pub enum AuthResult {
-    NotAuthorised,
     AuthenticationFailure(String),
     NotAuthenticated,
     Success,
@@ -133,45 +148,54 @@ impl Rule {
     }
 }
 
-pub fn authenticate(
-    user: &User,
-    password: String,
-    config: &Config,
-    do_as: &User,
-    command: &str,
-) -> Result<AuthResult> {
-    let allowed_actions = get_matching_rules(user, config)
-        .into_iter()
-        .map(|r| Action::from_rule(&r, user))
+pub fn authenticate_password(run: &UdoRun, config: &Config, password: String) -> AuthResult {
+    match authenticate_user(&run.user.name, &password, "udo") {
+        Ok(_) => AuthResult::Success,
+        Err(e) => match e.kind {
+            AuthErrorKind::InvalidInput | AuthErrorKind::StartFailure => {
+                AuthResult::AuthenticationFailure(e.to_string())
+            }
+            AuthErrorKind::AuthenticateFailure | AuthErrorKind::ValidationFailure => {
+                AuthResult::NotAuthenticated
+            }
+        },
+    }
+}
+
+pub fn check_action_auth(run: &UdoRun, config: &Config) -> bool {
+    // Get the rules the user is authorised to run
+    let applicable_rules = get_matching_rules(&run.user, config);
+    let allowed_actions = applicable_rules
+        .iter()
+        .map(|r| Action::from_rule(r))
         .collect::<Vec<_>>();
 
-    let hostname = gethostname()?;
+    // Get the current hostname. If we can't get it, only allow the action to proceed if there is
+    // an allowed action with hostname rule any
+    let hostname = gethostname().ok();
 
-    let action = Action {
-        command: ActionValue::from(command),
-        host: ActionValue::from(hostname.to_string_lossy().to_string()),
-        run_as: ActionValue::from(do_as.name.clone()),
-    };
-
-    let matching = allowed_actions.iter().find(|a| a.contains(&action));
-
-    if matching.is_some() {
-        match authenticate_user(&user.name, &password, "udo") {
-            Ok(_) => return Ok(AuthResult::Success),
-            Err(e) => match e.kind {
-                AuthErrorKind::InvalidInput | AuthErrorKind::StartFailure => {
-                    return Ok(AuthResult::AuthenticationFailure(e.to_string()));
-                }
-                AuthErrorKind::AuthenticateFailure | AuthErrorKind::ValidationFailure => {
-                    return Ok(AuthResult::NotAuthenticated);
-                }
-            },
-        }
-    } else {
-        return Ok(AuthResult::NotAuthorised);
+    if hostname.is_none()
+        && allowed_actions
+            .iter()
+            .find(|a| !matches!(a.host, Some(ActionValue::Any)))
+            .is_some()
+    {
+        return false;
     }
 
-    Ok(AuthResult::Success)
+    // Create the action of what the user is trying to do
+    let action = Action {
+        command: ActionValue::from(&run.command[0]),
+        host: hostname.map(|h| h.to_string_lossy().to_string().into()),
+        do_as: ActionValue::from(run.do_as.name.clone()),
+    };
+
+    let matching_actions = allowed_actions
+        .iter()
+        .filter(|a| a.contains(&action))
+        .collect::<Vec<_>>();
+
+    matching_actions.len() > 0
 }
 
 fn get_matching_rules(user: &User, config: &Config) -> Vec<Rule> {
@@ -181,13 +205,6 @@ fn get_matching_rules(user: &User, config: &Config) -> Vec<Rule> {
         .filter(|&r| r.check_authorization(user).is_ok_and(|v| v))
         .cloned()
         .collect()
-}
-
-fn is_authorised<'a>(user: &User, config: &'a Config) -> Option<&'a Rule> {
-    config
-        .rules
-        .iter()
-        .find(|r| matches!(r.check_authorization(user), Ok(true)))
 }
 
 #[cfg(target_os = "macos")]
