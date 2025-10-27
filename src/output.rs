@@ -15,8 +15,9 @@ pub mod theme;
 pub fn prompt_password(config: &Config) -> Result<String> {
     enable_raw_mode()?;
     let prompt = InputPrompt::default()
-        .password_prompt()
+        .password_prompt(config)
         .obscure(config.display.censor)
+        .char(config.display.theme.replace_char)
         .display_pw(config.display.display_pw);
 
     let res = prompt.run()?;

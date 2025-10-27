@@ -13,12 +13,12 @@ pub enum PromptStyle {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Theme {
-    replace_char: char,
-    prompt_color: Color,
-    error_color: Color,
-    warning_color: Color,
-    info_color: Color,
-    prompt_style: PromptStyle,
+    pub replace_char: char,
+    pub prompt_color: Color,
+    pub error_color: Color,
+    pub warning_color: Color,
+    pub info_color: Color,
+    pub prompt_style: PromptStyle,
 }
 
 impl Default for Theme {

@@ -11,12 +11,13 @@ use crossterm::{
     terminal::{Clear, ClearType},
 };
 
-use crate::output::MultiStyled;
+use crate::{config::Config, output::MultiStyled};
 
 pub struct InputPrompt {
     prompt: Option<MultiStyled<String>>,
     obscure: bool,
     display_pw: bool,
+    char: char,
 }
 
 impl Default for InputPrompt {
@@ -25,15 +26,22 @@ impl Default for InputPrompt {
             prompt: None,
             obscure: true,
             display_pw: true,
+            char: '•',
         }
     }
 }
 
 impl InputPrompt {
-    pub fn password_prompt(mut self) -> Self {
-        let base = ContentStyle::default().on_green().black();
+    pub fn password_prompt(mut self, config: &Config) -> Self {
+        let base = ContentStyle::default()
+            .on(config.display.theme.prompt_color)
+            .black();
+        let icon = match config.display.nerd {
+            true => "󰒃 ",
+            false => "* ",
+        };
         let prompt = MultiStyled::default()
-            .with(base.apply(" 󰒃 ".to_string()))
+            .with(base.apply(icon.to_string()))
             .with(base.apply("[udo]".to_string()).bold())
             .with(base.apply(" Password:".to_string()));
         self.prompt = Some(prompt);
@@ -50,6 +58,11 @@ impl InputPrompt {
         self
     }
 
+    pub fn char(mut self, char: char) -> Self {
+        self.char = char;
+        self
+    }
+
     pub fn run(&self) -> io::Result<String> {
         let mut content = String::new();
         let mut running = true;
@@ -63,7 +76,7 @@ impl InputPrompt {
             }
 
             if self.obscure && self.display_pw {
-                let obscured: String = (0..content.len()).map(|_| '•').collect();
+                let obscured: String = (0..content.len()).map(|_| self.char).collect();
                 print!("{obscured}");
             } else if self.display_pw {
                 print!("{content}");
