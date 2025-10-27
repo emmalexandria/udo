@@ -41,5 +41,10 @@ pub fn get_cli() -> Command {
                 .help("Clear the login cache"),
         )
         .arg(Arg::new("shell").short('s').long("shell").num_args(0..1))
-        .arg(Arg::new("login").short('l').long("login"))
+        .arg(
+            Arg::new("login")
+                .short('l')
+                .long("login")
+                .conflicts_with("shell"),
+        )
 }

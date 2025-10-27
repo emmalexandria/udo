@@ -16,7 +16,7 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use toml::Deserializer;
 
-use crate::{UdoRun, config::Config, elevate::ElevatedContext};
+use crate::{config::Config, elevate::ElevatedContext};
 
 #[derive(Debug, Clone)]
 pub struct Cache {

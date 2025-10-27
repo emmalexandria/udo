@@ -1,13 +1,16 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use crate::{
     cache::Cache,
     config::Config,
     run::{env::Env, process::run_process},
+    user::{get_root_user, get_user, get_user_by_id},
 };
-use anyhow::Result;
 use clap::ArgMatches;
-use nix::unistd::User;
+use nix::unistd::{User, getuid};
 
 pub mod env;
 pub mod process;
@@ -24,7 +27,7 @@ pub struct Command {
     pub c_type: CommandType,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub struct ActionInfo {
     requires_auth: bool,
     requires_root: bool,
@@ -32,38 +35,107 @@ pub struct ActionInfo {
 
 // We use repr(i32) here to allow for automatic ordering of the actions
 #[repr(i32)]
-#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Hash)]
 pub enum RunAction {
     ClearCache = 0,
-    OpenShell = 1,
-    RunCommand = 2,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum Flag {
-    NoCheck,
-    LoginShell,
+    LoginShell = 1,
+    NormalShell = 2,
+    RunCommand = 3,
 }
 
 impl RunAction {
-    pub fn do_action(config: &Config) {}
+    pub fn do_action(run: &Run, config: &Config) {}
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
+pub enum Flag {
+    NoCheck,
+    PreserveVars,
 }
 
 #[derive(Debug, Clone)]
-struct UdoRun {
+pub enum ErrorKind {
+    NoUser,
+}
+
+#[derive(Debug, Clone)]
+pub struct Error {
+    pub kind: ErrorKind,
+    pub message: String,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {:?}", self.message, self.kind)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl Error {
+    pub fn new<S: ToString>(kind: ErrorKind, message: S) -> Self {
+        Self {
+            kind,
+            message: message.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Run {
     pub actions: HashMap<RunAction, ActionInfo>,
-    pub preserve_vars: bool,
-    pub clear_cache: bool,
+    pub flags: HashSet<Flag>,
     pub cache: Cache,
     pub user: User,
     pub do_as: User,
 }
 
-impl UdoRun {
-    pub fn create(matches: &ArgMatches, config: &Config) -> Self {
-        let actions = HashMap::new();
+impl Run {
+    pub fn create(matches: &ArgMatches, config: &Config) -> Result<Self, Error> {
+        let do_as_arg = matches
+            .get_one::<String>("user")
+            .expect("No user specified. This should not happen! Please file a bug report");
+        let do_as = match get_user(&do_as_arg) {
+            Some(u) => u,
+            None => return Err(Error::new(ErrorKind::NoUser, "Couldn't get target user")),
+        };
 
-        Self { actions }
+        let user = get_user_by_id(getuid())
+            .expect("Cannot get current user. This should not happen! Please file a bug report");
+        let root = get_root_user();
+
+        let cache = Cache::new(&user, &root);
+
+        let actions = HashMap::new();
+        let flags = Self::get_flags(matches);
+
+        Ok(Self {
+            cache,
+            do_as,
+            user,
+            actions,
+            flags,
+        })
+    }
+
+    fn get_actions(matches: &ArgMatches) -> HashMap<RunAction, ActionInfo> {
+        let mut ret = HashMap::new();
+
+        if 
+
+        ret
+    }
+
+    fn get_flags(matches: &ArgMatches) -> HashSet<Flag> {
+        let mut ret = HashSet::new();
+        if let Some(p) = matches.get_one::<bool>("preserve") {
+            ret.insert(Flag::PreserveVars);
+        }
+        if let Some(p) = matches.get_one::<bool>("nocheck") {
+            ret.insert(Flag::NoCheck);
+        }
+
+        ret
     }
 
     pub fn do_run(&self) -> Result<()> {
