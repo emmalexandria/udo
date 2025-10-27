@@ -16,7 +16,7 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use toml::Deserializer;
 
-use crate::{config::Config, elevate::ElevatedContext};
+use crate::{config::Config, elevate::ElevatedContext, run::Run};
 
 #[derive(Debug, Clone)]
 pub struct Cache {
@@ -67,12 +67,12 @@ impl Cache {
         Ok(self.dir.clone())
     }
 
-    pub fn cache_run(&mut self, run: UdoRun) -> Result<()> {
+    pub fn cache_run(&self, run: &Run) -> Result<()> {
         let id = Self::get_id(&run.user)?;
         let mut f_path = self.dir.clone();
         f_path.push(id);
 
-        let run = CacheEntry::try_from(&run)?;
+        let run = CacheEntry::try_from(run)?;
 
         let mut buf = toml::ser::Buffer::new();
         let se = toml::Serializer::new(&mut buf);
@@ -86,7 +86,7 @@ impl Cache {
         Ok(())
     }
 
-    pub fn check_cache(&mut self, run: UdoRun, config: &Config) -> Result<bool> {
+    pub fn check_cache(&self, run: &Run, config: &Config) -> Result<bool> {
         let id = Self::get_id(&run.user)?;
         let mut full = self.dir.clone();
         full.push(id);
@@ -109,7 +109,7 @@ impl Cache {
         Ok(time_valid && user_valid)
     }
 
-    pub fn clear(&mut self) -> Result<()> {
+    pub fn clear(&self) -> Result<()> {
         self.context.elevate()?;
 
         if self.dir.exists() && self.dir.is_dir() {
@@ -133,10 +133,10 @@ impl CacheEntry {
     }
 }
 
-impl TryFrom<&UdoRun> for CacheEntry {
+impl TryFrom<&Run<'_>> for CacheEntry {
     type Error = anyhow::Error;
 
-    fn try_from(run: &UdoRun) -> std::result::Result<Self, Self::Error> {
+    fn try_from(run: &Run) -> std::result::Result<Self, Self::Error> {
         let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
         Ok(CacheEntry::new(time.num_seconds(), run.do_as.uid.as_raw()))
     }

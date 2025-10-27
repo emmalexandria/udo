@@ -18,18 +18,6 @@ use std::process::exit;
 pub mod env;
 pub mod process;
 
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum CommandType {
-    Command,
-    Shell(bool),
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct Command {
-    pub command: String,
-    pub c_type: CommandType,
-}
-
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Default)]
 pub struct ActionReqs {
     requires_auth: bool,

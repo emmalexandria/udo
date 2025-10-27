@@ -9,7 +9,7 @@ use nix::{
     unistd::{ForkResult, Pid, execvp, fork},
 };
 
-use crate::{CommandType, run::env::Env};
+use crate::run::env::Env;
 
 pub fn run_process<S: ToString>(cmd: &[S], env: &Env) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
@@ -25,7 +25,7 @@ pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &Env) -> Result<()> 
     let cmd_name = name.to_string();
     let mut args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
 
-    if env.command_type == CommandType::Shell(true) {
+    if env.login {
         args[0] = format!("-{}", args[0]);
     }
 

@@ -7,9 +7,9 @@ use nix::unistd::{Group, User, gethostname};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    UdoRun,
     authenticate::pam::{AuthErrorKind, authenticate_user},
     config::Config,
+    run::Run,
 };
 
 /// ActionValue represents a value within [Action]. It can either be Any, or a specific Value.
@@ -156,7 +156,7 @@ impl Rule {
 }
 
 /// Attempts to authenticate the user with the given password
-pub fn authenticate_password(run: &UdoRun, config: &Config, password: String) -> AuthResult {
+pub fn authenticate_password(run: &Run, config: &Config, password: String) -> AuthResult {
     match authenticate_user(&run.user.name, &password, "udo") {
         Ok(_) => AuthResult::Success,
         Err(e) => match e.kind {
@@ -174,7 +174,7 @@ pub fn authenticate_password(run: &UdoRun, config: &Config, password: String) ->
 ///
 /// If the hostname cannot be retrieved, it will allow the action only if
 /// there is a [Rule] with hostname ANY
-pub fn check_action_auth(run: &UdoRun, config: &Config) -> bool {
+pub fn check_action_auth(run: &Run, config: &Config) -> bool {
     // Get the rules the user is authorised to run
     let applicable_rules = get_matching_rules(&run.user, config);
     let allowed_actions = applicable_rules
@@ -197,7 +197,7 @@ pub fn check_action_auth(run: &UdoRun, config: &Config) -> bool {
 
     // Create the action of what the user is trying to do
     let action = Action {
-        command: ActionValue::from(&run.command[0]),
+        command: ActionValue::from(&run.command.as_ref().unwrap()[0]),
         host: hostname.map(|h| h.to_string_lossy().to_string().into()),
         do_as: ActionValue::from(run.do_as.name.clone()),
     };
