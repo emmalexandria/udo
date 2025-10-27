@@ -12,7 +12,7 @@ use nix::{
 };
 
 use crate::{
-    authenticate::{AuthResult, authenticate},
+    authenticate::{AuthResult, authenticate_password, check_action_auth},
     cache::Cache,
     cli::get_cli,
     config::Config,
@@ -126,11 +126,8 @@ fn create_run(matches: ArgMatches, config: &Config) -> UdoRun {
         }];
         c_type = CommandType::Shell(login);
     } else {
-        command = matches
-            .get_many::<String>("command")
-            .unwrap()
-            .cloned()
-            .collect();
+        let command_ref = matches.get_many::<String>("command").unwrap_or_default();
+        command = command_ref.cloned().collect();
         c_type = CommandType::Command;
     }
 
@@ -188,17 +185,11 @@ fn login_user(run: &mut UdoRun, config: &Config, tries: usize) -> Result<bool> {
         );
     }
 
-    let auth = authenticate(
-        &run.user,
-        password.unwrap(),
-        config,
-        &run.do_as,
-        &run.command[0],
-    );
+    let auth = authenticate_password(run, config, password.unwrap());
 
     match auth {
-        Ok(AuthResult::Success) => Ok(true),
-        Ok(AuthResult::NotAuthenticated) => {
+        AuthResult::Success => Ok(true),
+        AuthResult::NotAuthenticated => {
             if tries > 1 {
                 wrong_password(config.display.nerd, tries - 1);
                 login_user(run, config, tries - 1)
@@ -207,19 +198,11 @@ fn login_user(run: &mut UdoRun, config: &Config, tries: usize) -> Result<bool> {
                 Ok(false)
             }
         }
-        Ok(AuthResult::NotAuthorised) => {
-            not_authenticated(&run.user, config);
-            Ok(false)
-        }
-        Ok(AuthResult::AuthenticationFailure(s)) => {
+        AuthResult::AuthenticationFailure(s) => {
             output::error(
                 format!("Authentication with PAM failed ({s})"),
                 config.display.nerd,
             );
-            Ok(false)
-        }
-        Err(e) => {
-            output::error(format!("Error authenticating: {e}"), config.display.nerd);
             Ok(false)
         }
     }
@@ -234,9 +217,14 @@ fn after_login(udo_run: &mut UdoRun, config: &Config) -> Result<()> {
         );
     }
 
-    udo_run.cache.create_dir()?;
-    udo_run.cache.cache_run(udo_run.clone())?;
+    if !udo_run.command.is_empty() && check_action_auth(udo_run, config) {
+        udo_run.cache.create_dir()?;
+        udo_run.cache.cache_run(udo_run.clone())?;
 
-    do_run(udo_run, config)?;
+        do_run(udo_run, config)?;
+    } else if !udo_run.command.is_empty() {
+        not_authenticated(&udo_run.user, config);
+    }
+
     process::exit(0)
 }
