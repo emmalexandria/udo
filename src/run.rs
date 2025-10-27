@@ -1,13 +1,10 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-    os,
-};
+use std::{collections::HashSet, fmt::Display};
 
 use crate::{
+    authenticate::{AuthResult, authenticate_password},
     cache::Cache,
     config::Config,
-    login_user, output,
+    output::{self, lockout, prompt_password, wrong_password},
     user::{get_root_user, get_user, get_user_by_id},
 };
 use clap::ArgMatches;
@@ -142,6 +139,7 @@ impl Error {
 pub struct Run<'a> {
     pub actions: Vec<Action>,
     pub flags: HashSet<Flag>,
+    pub command: Option<Vec<String>>,
     pub cache: Cache,
     pub user: User,
     pub do_as: User,
@@ -166,8 +164,14 @@ impl<'a> Run<'a> {
 
         let actions = Self::get_actions(matches);
         let flags = Self::get_flags(matches);
+        let mut command = None;
+
+        if let Some(cmd) = matches.get_many::<String>("command") {
+            command = Some(cmd.cloned().collect::<Vec<_>>());
+        }
 
         Ok(Self {
+            command,
             cache,
             do_as,
             user,
@@ -188,7 +192,6 @@ impl<'a> Run<'a> {
         if matches.get_flag("shell") {
             ret.push(Action::new(ActionType::Login, ActionReqs::auth()));
         }
-        if let Some(cmd) = matches.get_many("command") {}
 
         ret
     }
@@ -205,7 +208,7 @@ impl<'a> Run<'a> {
         ret
     }
 
-    pub fn do_run(&mut self) -> Result<(), Error> {
+    pub fn do_run(&mut self) -> anyhow::Result<()> {
         let mut actions = self.actions.clone();
         actions.sort();
 
@@ -237,7 +240,7 @@ impl<'a> Run<'a> {
             a.do_action(self, &self.config);
         });
 
-        let auth = login_user(self, &self.config, self.config.security.tries);
+        let auth = self.login_user(self.config.security.tries);
         match auth {
             Ok(true) => self.after_auth(requires_login, requires_root)?,
             Ok(false) => output::info("Login failed", self.config.display.nerd),
@@ -247,6 +250,46 @@ impl<'a> Run<'a> {
         }
 
         Ok(())
+    }
+
+    fn login_user(&mut self, tries: usize) -> anyhow::Result<bool> {
+        match self.cache.check_cache(self, self.config) {
+            Ok(true) => return Ok(true),
+            Ok(false) => {}
+            Err(e) => output::error(
+                format!("Failed to check cache ({e}). Requesting password"),
+                self.config.display.nerd,
+            ),
+        }
+
+        let password = prompt_password(self.config);
+        if let Err(e) = &password {
+            output::error(
+                format!("Failed to display password prompt ({e}"),
+                self.config.display.nerd,
+            )
+        }
+
+        match authenticate_password(self, self.config, password.unwrap()) {
+            AuthResult::Success => Ok(true),
+            AuthResult::NotAuthenticated => {
+                if tries > 1 {
+                    wrong_password(self.config.display.nerd, tries - 1);
+                    self.login_user(tries - 1)
+                } else {
+                    lockout(self.config);
+                    Ok(false)
+                }
+            }
+            AuthResult::AuthenticationFailure(s) => {
+                output::error_with_details(
+                    "Authentication with PAM failed",
+                    s,
+                    self.config.display.nerd,
+                );
+                Ok(false)
+            }
+        }
     }
 
     fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
