@@ -37,8 +37,8 @@ impl InputPrompt {
             .on(config.display.theme.prompt_color)
             .black();
         let icon = match config.display.nerd {
-            true => "󰒃 ",
-            false => "* ",
+            true => " 󰒃 ",
+            false => " * ",
         };
         let prompt = MultiStyled::default()
             .with(base.apply(icon.to_string()))
