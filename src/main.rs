@@ -217,12 +217,12 @@ fn after_login(udo_run: &mut UdoRun, config: &Config) -> Result<()> {
         );
     }
 
-    if check_action_auth(udo_run, config) {
+    if !udo_run.command.is_empty() && check_action_auth(udo_run, config) {
         udo_run.cache.create_dir()?;
         udo_run.cache.cache_run(udo_run.clone())?;
 
         do_run(udo_run, config)?;
-    } else {
+    } else if !udo_run.command.is_empty() {
         not_authenticated(&udo_run.user, config);
     }
 
