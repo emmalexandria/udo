@@ -4,7 +4,7 @@ use nix::unistd::{User, setuid};
 
 use anyhow::Result;
 
-use crate::{CommandType, UdoRun, config::Config};
+use crate::{CommandType, UdoRun};
 
 pub struct Vars {
     pub home: String,
