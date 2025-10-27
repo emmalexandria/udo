@@ -17,12 +17,12 @@ pub struct Vars {
 impl Vars {
     const SAFE_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
-    pub fn from_user(user: &User) -> Self {
+    pub fn from_user(user: &User, shell: String) -> Self {
         Self {
             home: user.dir.to_string_lossy().to_string(),
             user: user.name.clone(),
             logname: user.name.clone(),
-            shell: user.shell.to_string_lossy().to_string(),
+            shell,
             path: Self::SAFE_PATH.to_string(),
         }
     }
@@ -64,7 +64,7 @@ impl Env {
             command_type: CommandType::Shell(true),
             safe_vars,
             preserve_all: run.preserve_vars,
-            set_vars: Vars::from_user(&run.do_as),
+            set_vars: Vars::from_user(&run.do_as, Self::get_shell(run)),
             do_as: run.do_as.clone(),
         }
     }
@@ -77,8 +77,17 @@ impl Env {
             command_type: CommandType::Shell(false),
             safe_vars,
             preserve_all: run.preserve_vars,
-            set_vars: Vars::from_user(&run.do_as),
+            set_vars: Vars::from_user(&run.do_as, Self::get_shell(run)),
             do_as: run.do_as.clone(),
+        }
+    }
+
+    fn get_shell(run: &UdoRun) -> String {
+        match run.c_type {
+            CommandType::Shell(true) => run.do_as.shell.to_string_lossy().to_string(),
+            CommandType::Shell(false) | CommandType::Command => {
+                run.user.shell.to_string_lossy().to_string()
+            }
         }
     }
 
@@ -89,7 +98,7 @@ impl Env {
             command_type: CommandType::Command,
             safe_vars,
             preserve_all: run.preserve_vars,
-            set_vars: Vars::from_user(&run.do_as),
+            set_vars: Vars::from_user(&run.do_as, Self::get_shell(run)),
             do_as: run.do_as.clone(),
         }
     }
@@ -103,6 +112,10 @@ impl Env {
         unsafe {
             self.apply_vars();
             self.elevate_final()?;
+        }
+
+        if self.command_type == CommandType::Shell(true) {
+            env::set_current_dir(&self.set_vars.home)?;
         }
 
         Ok(())
@@ -122,6 +135,7 @@ impl Env {
 
             env::set_var("PATH", &self.set_vars.path);
             env::set_var("HOME", &self.set_vars.home);
+            env::set_var("SHELL", &self.set_vars.shell);
             env::set_var("USER", &self.set_vars.user);
             env::set_var("LOGNAME", &self.set_vars.logname);
         }

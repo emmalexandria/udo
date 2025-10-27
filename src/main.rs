@@ -120,7 +120,10 @@ fn create_run(matches: ArgMatches, config: &Config) -> UdoRun {
 
     if let Some(("--shell", m)) = matches.subcommand() {
         let login = m.get_one::<bool>("login").copied().unwrap_or_default();
-        command = vec![do_as.shell.to_string_lossy().to_string()];
+        command = vec![match login {
+            true => do_as.shell.to_string_lossy().to_string(),
+            false => user.shell.to_string_lossy().to_string(),
+        }];
         c_type = CommandType::Shell(login);
     } else {
         command = matches
