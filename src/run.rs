@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
+    os,
 };
 
 use crate::{
@@ -15,6 +16,7 @@ use nix::{
     unistd::{Uid, User, getuid},
 };
 use std::env as std_env;
+use std::process::exit;
 
 pub mod env;
 pub mod process;
@@ -207,7 +209,9 @@ impl<'a> Run<'a> {
         let mut actions = self.actions.clone();
         actions.sort();
 
-        if !self.flags.contains(&Flag::NoCheck) {}
+        if !self.flags.contains(&Flag::NoCheck) && !check_perms(self.config) {
+            exit(1);
+        }
 
         // Actions which require the user logs in
         let requires_login = actions
@@ -235,7 +239,7 @@ impl<'a> Run<'a> {
 
         let auth = login_user(self, &self.config, self.config.security.tries);
         match auth {
-            Ok(true) => self.after_auth()?,
+            Ok(true) => self.after_auth(requires_login, requires_root)?,
             Ok(false) => output::info("Login failed", self.config.display.nerd),
             Err(e) => {
                 output::error_with_details("Error while logging in", e, self.config.display.nerd)
@@ -245,7 +249,12 @@ impl<'a> Run<'a> {
         Ok(())
     }
 
-    fn after_auth(&self) -> Result<(), Error> {
+    fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
+        if !self.do_as.uid.is_root() {}
+
+        for action in login {
+            action.do_action(self, self.config);
+        }
         Ok(())
     }
 }

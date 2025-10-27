@@ -53,7 +53,7 @@ fn main() {
 
     let run = Run::create(&matches, &config);
     match run {
-        Ok(r) => {
+        Ok(mut r) => {
             r.do_run();
         }
         Err(e) => output::error_with_details("Failed to initialise run", e, config.display.nerd),
@@ -101,25 +101,4 @@ fn login_user(run: &mut UdoRun, config: &Config, tries: usize) -> Result<bool> {
             Ok(false)
         }
     }
-}
-
-fn after_login(udo_run: &mut UdoRun, config: &Config) -> Result<()> {
-    if udo_run.clear_cache {
-        udo_run.cache.clear().unwrap();
-        output::info(
-            format!("Cleared cache for \"{}\" of all entries", udo_run.user.name),
-            config.display.nerd,
-        );
-    }
-
-    if !udo_run.command.is_empty() && check_action_auth(udo_run, config) {
-        udo_run.cache.create_dir()?;
-        udo_run.cache.cache_run(udo_run.clone())?;
-
-        do_run(udo_run, config)?;
-    } else if !udo_run.command.is_empty() {
-        not_authenticated(&udo_run.user, config);
-    }
-
-    process::exit(0)
 }
