@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env,
     process::{self, exit},
 };
@@ -30,23 +31,6 @@ mod error;
 mod output;
 mod run;
 mod user;
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum CommandType {
-    Command,
-    Shell(bool),
-}
-
-#[derive(Debug, Clone)]
-struct UdoRun {
-    pub command: Vec<String>,
-    pub c_type: CommandType,
-    pub preserve_vars: bool,
-    pub clear_cache: bool,
-    pub cache: Cache,
-    pub user: User,
-    pub do_as: User,
-}
 
 fn main() {
     let cli = get_cli();
