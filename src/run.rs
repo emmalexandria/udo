@@ -55,10 +55,27 @@ pub enum ActionType {
     RunCommand = 3,
 }
 
+impl Display for ActionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::ClearCache => "clear_cache",
+            Self::Login => "login_shell",
+            Self::Shell => "normal_shell",
+            Self::RunCommand => "run_command",
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Action {
     a_type: ActionType,
     reqs: ActionReqs,
+}
+
+impl Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.a_type)
+    }
 }
 
 impl PartialOrd for Action {
@@ -224,10 +241,6 @@ impl<'a> Run<'a> {
             .filter(|a| !requires_root.contains(a) && !requires_login.contains(a))
             .collect::<Vec<_>>();
 
-        rest.iter().for_each(|a| {
-            a.do_action(self, &self.config);
-        });
-
         let auth = self.login_user(self.config.security.tries);
         match auth {
             Ok(true) => self.after_auth(requires_login, requires_root)?,
@@ -284,7 +297,15 @@ impl<'a> Run<'a> {
         if !self.do_as.uid.is_root() {}
 
         for action in login {
-            action.do_action(self, self.config);
+            let res = action.do_action(self, self.config);
+
+            if res.is_err() {
+                output::error_with_details(
+                    format!("Unable to perform {action}"),
+                    res.err().unwrap(),
+                    self.config.display.nerd,
+                );
+            }
         }
         Ok(())
     }
