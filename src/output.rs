@@ -10,6 +10,7 @@ use nix::unistd::User;
 use crate::{config::Config, output::prompt::InputPrompt};
 
 pub mod prompt;
+pub mod theme;
 
 pub fn prompt_password(config: &Config) -> Result<String> {
     enable_raw_mode()?;
@@ -41,6 +42,31 @@ pub fn error<D: Display>(error: D, icon: bool) {
     let block = block(&style, "Error", &icon.to_string());
 
     eprintln!("{block} {error}");
+}
+
+pub fn error_with_details<S: Display, E: Display>(message: S, details: E, icon: bool) {
+    error(message, icon);
+    let details_style = ContentStyle::default().on_black();
+    let details = details.to_string();
+    let lines = details.lines().collect::<Vec<_>>();
+    let mut longest = 0;
+    lines.iter().for_each(|l| {
+        if l.len() > longest {
+            longest = l.len()
+        }
+    });
+
+    let padded_lines = lines
+        .iter()
+        .map(|l| {
+            let diff = longest - l.len();
+            let pad = (0..diff).map(|_| ' ').collect::<String>();
+            format!("{l}{pad}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let content = details_style.apply(padded_lines);
+    eprintln!("{content}");
 }
 
 pub fn info<D: Display>(info: D, icon: bool) {

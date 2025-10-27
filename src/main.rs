@@ -48,12 +48,16 @@ struct UdoRun {
     pub do_as: User,
 }
 
-fn main() -> color_eyre::Result<()> {
-    color_eyre::install()?;
-
+fn main() {
     let cli = get_cli();
     let matches = cli.get_matches();
-    let config = Config::read().unwrap();
+    let config = match Config::read() {
+        Ok(c) => c,
+        Err(e) => {
+            output::error_with_details("Config error", e, false);
+            exit(1)
+        }
+    };
 
     if !config.display.color {
         force_color_output(false);
@@ -75,8 +79,6 @@ fn main() -> color_eyre::Result<()> {
         Ok(false) => output::info("Login failed", config.display.nerd),
         Err(e) => output::error(format!("Error while logging in {}", e), config.display.nerd),
     }
-
-    Ok(())
 }
 
 fn create_run(matches: ArgMatches, config: &Config) -> UdoRun {

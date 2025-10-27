@@ -1,9 +1,13 @@
 use anyhow::Result;
-use std::fs;
+use std::{fs, io};
+use toml::Deserializer;
 
 use serde::{Deserialize, Serialize};
 
-use crate::authenticate::Rule;
+use crate::{
+    authenticate::Rule,
+    output::{self, theme::Theme},
+};
 
 const CONFIG_PATH: &str = "/etc/udo/config.toml";
 
@@ -36,6 +40,8 @@ pub struct DisplayConfig {
     pub censor: bool,
     #[serde(default)]
     pub display_pw: bool,
+    #[serde(default)]
+    pub theme: Theme,
 }
 
 impl Default for DisplayConfig {
@@ -46,12 +52,12 @@ impl Default for DisplayConfig {
             nerd: false,
             censor: true,
             display_pw: true,
+            theme: Theme::default(),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Config {
     #[serde(default)]
     pub display: DisplayConfig,
@@ -61,11 +67,37 @@ pub struct Config {
     pub security: SecurityConfig,
 }
 
-
 impl Config {
     pub fn read() -> Result<Self> {
-        let content = fs::read_to_string(CONFIG_PATH)?;
-        let de = toml::Deserializer::parse(&content)?;
-        Ok(Self::deserialize(de)?)
+        let mut de: Option<Deserializer> = None;
+        let mut content: Option<String> = None;
+        match fs::read_to_string(CONFIG_PATH) {
+            Ok(f) => content = Some(f),
+            Err(e) => output::error(format!("Failed to read config file ({e})"), false),
+        };
+
+        if let Some(c) = &content {
+            match toml::Deserializer::parse(c) {
+                Ok(d) => de = Some(d),
+                Err(e) => output::error(format!("Failed to create deserializer ({e})"), false),
+            }
+        }
+
+        if let Some(de) = de {
+            match Self::deserialize(de) {
+                Ok(c) => Ok(c),
+                Err(e) => Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Could not parse config file \n{e}"),
+                )
+                .into()),
+            }
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "could not read configuration file",
+            )
+            .into())
+        }
     }
 }
