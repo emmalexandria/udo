@@ -27,10 +27,22 @@ pub struct Command {
     pub c_type: CommandType,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Hash)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash, Default)]
 pub struct ActionInfo {
     requires_auth: bool,
     requires_root: bool,
+}
+
+impl ActionInfo {
+    pub fn with_auth(mut self) -> Self {
+        self.requires_auth = true;
+        self
+    }
+
+    pub fn with_root(mut self) -> Self {
+        self.requires_root = true;
+        self
+    }
 }
 
 // We use repr(i32) here to allow for automatic ordering of the actions
@@ -38,8 +50,7 @@ pub struct ActionInfo {
 #[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Hash)]
 pub enum RunAction {
     ClearCache = 0,
-    LoginShell = 1,
-    NormalShell = 2,
+    Shell(bool) = 2,
     RunCommand = 3,
 }
 
@@ -106,7 +117,7 @@ impl Run {
 
         let cache = Cache::new(&user, &root);
 
-        let actions = HashMap::new();
+        let actions = Self::get_actions(matches);
         let flags = Self::get_flags(matches);
 
         Ok(Self {
@@ -120,8 +131,15 @@ impl Run {
 
     fn get_actions(matches: &ArgMatches) -> HashMap<RunAction, ActionInfo> {
         let mut ret = HashMap::new();
-
-        if 
+        if matches.get_flag("clear") {
+            ret.insert(RunAction::ClearCache, ActionInfo::default().with_auth());
+        }
+        if matches.get_flag("login") {
+            ret.insert(RunAction::Shell(true), ActionInfo::default().with_auth());
+        }
+        if matches.get_flag("shell") {
+            ret.insert(RunAction::Shell(false), ActionInfo::default());
+        }
 
         ret
     }
@@ -139,6 +157,7 @@ impl Run {
     }
 
     pub fn do_run(&self) -> Result<()> {
-        Ok(())
+        let actions = self.actions.iter()
+
     }
 }

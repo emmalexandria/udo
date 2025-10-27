@@ -45,6 +45,7 @@ pub fn get_cli() -> Command {
             Arg::new("login")
                 .short('l')
                 .long("login")
-                .conflicts_with("shell"),
+                .conflicts_with("shell")
+                .action(ArgAction::SetTrue),
         )
 }
