@@ -58,33 +58,6 @@ fn main() {
         }
         Err(e) => output::error_with_details("Failed to initialise run", e, config.display.nerd),
     }
-
-    match login_user(&mut udo_run, &config, config.security.tries) {
-        Ok(true) => after_login(&mut udo_run, &config).unwrap(),
-        Ok(false) => output::info("Login failed", config.display.nerd),
-        Err(e) => output::error(format!("Error while logging in {}", e), config.display.nerd),
-    }
-}
-
-fn check_perms(config: &Config) -> bool {
-    let exe = env::current_exe().unwrap();
-    let st = stat(&exe).unwrap();
-
-    let mut valid = true;
-
-    let owner = Uid::from_raw(st.st_uid);
-    if !owner.is_root() {
-        output::error("udo is not owned by root", config.display.nerd);
-        valid = false;
-    }
-
-    let perms = Mode::from_bits_truncate(st.st_mode);
-    if !perms.contains(Mode::S_ISUID) {
-        output::error("udo does not have suid perms", config.display.nerd);
-        valid = false;
-    }
-
-    valid
 }
 
 fn login_user(run: &mut UdoRun, config: &Config, tries: usize) -> Result<bool> {

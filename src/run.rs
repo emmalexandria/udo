@@ -6,12 +6,15 @@ use std::{
 use crate::{
     cache::Cache,
     config::Config,
-    login_user,
-    run::{env::Env, process::run_process},
+    login_user, output,
     user::{get_root_user, get_user, get_user_by_id},
 };
 use clap::ArgMatches;
-use nix::unistd::{User, getuid};
+use nix::{
+    sys::stat::{Mode, stat},
+    unistd::{Uid, User, getuid},
+};
+use std::env as std_env;
 
 pub mod env;
 pub mod process;
@@ -107,7 +110,7 @@ pub enum Flag {
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
     NoUser,
-    IncorrectExePerms
+    IncorrectExePerms,
 }
 
 #[derive(Debug, Clone)]
@@ -204,9 +207,7 @@ impl<'a> Run<'a> {
         let mut actions = self.actions.clone();
         actions.sort();
 
-        if !self.flags.contains(&Flag::NoCheck) {
-
-        }
+        if !self.flags.contains(&Flag::NoCheck) {}
 
         // Actions which require the user logs in
         let requires_login = actions
@@ -228,17 +229,45 @@ impl<'a> Run<'a> {
             .filter(|a| !requires_root.contains(a) && !requires_login.contains(a))
             .collect::<Vec<_>>();
 
-        rest.iter().for_each(|a| {a.do_action(self, &self.config);});
+        rest.iter().for_each(|a| {
+            a.do_action(self, &self.config);
+        });
 
         let auth = login_user(self, &self.config, self.config.security.tries);
         match auth {
-            Ok(true) => 
+            Ok(true) => self.after_auth()?,
+            Ok(false) => output::info("Login failed", self.config.display.nerd),
+            Err(e) => {
+                output::error_with_details("Error while logging in", e, self.config.display.nerd)
+            }
         }
 
         Ok(())
     }
 
-    fn after_auth() -> Result<(), Error> {
-
+    fn after_auth(&self) -> Result<(), Error> {
+        Ok(())
     }
+}
+
+/// Helper function to check if the executable has the correct permissions
+fn check_perms(config: &Config) -> bool {
+    let exe = std_env::current_exe().unwrap();
+    let st = stat(&exe).unwrap();
+
+    let mut valid = true;
+
+    let owner = Uid::from_raw(st.st_uid);
+    if !owner.is_root() {
+        output::error("udo is not owned by root", config.display.nerd);
+        valid = false;
+    }
+
+    let perms = Mode::from_bits_truncate(st.st_mode);
+    if !perms.contains(Mode::S_ISUID) {
+        output::error("udo does not have suid perms", config.display.nerd);
+        valid = false;
+    }
+
+    valid
 }
