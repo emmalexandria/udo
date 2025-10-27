@@ -18,7 +18,7 @@ use crate::{
     cli::get_cli,
     config::Config,
     output::{lockout, not_authenticated, prompt_password, wrong_password},
-    run::do_run,
+    run::Run,
     user::{get_root_user, get_user, get_user_by_id},
 };
 
@@ -51,80 +51,18 @@ fn main() {
         force_color_output(false);
     }
 
-    let nocheck = matches
-        .get_one::<bool>("nocheck")
-        .copied()
-        .unwrap_or_default();
-
-    if !nocheck && !check_perms(&config) {
-        process::exit(1)
+    let run = Run::create(&matches, &config);
+    match run {
+        Ok(r) => {
+            r.do_run();
+        }
+        Err(e) => output::error_with_details("Failed to initialise run", e, config.display.nerd),
     }
-
-    let mut udo_run = create_run(matches, &config);
 
     match login_user(&mut udo_run, &config, config.security.tries) {
         Ok(true) => after_login(&mut udo_run, &config).unwrap(),
         Ok(false) => output::info("Login failed", config.display.nerd),
         Err(e) => output::error(format!("Error while logging in {}", e), config.display.nerd),
-    }
-}
-
-fn create_run(matches: ArgMatches, config: &Config) -> UdoRun {
-    let do_as = get_user(
-        &matches
-            .get_one::<String>("user")
-            .cloned()
-            .unwrap_or("root".to_string()),
-    )
-    .expect("Failed to get do_as user");
-    let user = get_user_by_id(getuid()).expect("Failed to get current user");
-
-    let root = match do_as.uid.is_root() {
-        true => &do_as,
-        false => &get_root_user(),
-    };
-
-    if user.uid == do_as.uid {
-        output::error("Already running as target user", config.display.nerd);
-        exit(1);
-    }
-
-    let clear_cache = matches
-        .get_one::<bool>("clear")
-        .copied()
-        .unwrap_or_default();
-
-    let preserve_vars = matches
-        .get_one::<bool>("preserve")
-        .copied()
-        .unwrap_or_default();
-
-    let command: Vec<String>;
-    let c_type: CommandType;
-
-    if let Some(("--shell", m)) = matches.subcommand() {
-        let login = m.get_one::<bool>("login").copied().unwrap_or_default();
-        command = vec![match login {
-            true => do_as.shell.to_string_lossy().to_string(),
-            false => user.shell.to_string_lossy().to_string(),
-        }];
-        c_type = CommandType::Shell(login);
-    } else {
-        let command_ref = matches.get_many::<String>("command").unwrap_or_default();
-        command = command_ref.cloned().collect();
-        c_type = CommandType::Command;
-    }
-
-    let cache = Cache::new(&user, root);
-
-    UdoRun {
-        user,
-        do_as,
-        command,
-        cache,
-        c_type,
-        preserve_vars,
-        clear_cache,
     }
 }
 

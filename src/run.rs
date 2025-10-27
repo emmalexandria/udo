@@ -6,6 +6,7 @@ use std::{
 use crate::{
     cache::Cache,
     config::Config,
+    login_user,
     run::{env::Env, process::run_process},
     user::{get_root_user, get_user, get_user_by_id},
 };
@@ -27,19 +28,28 @@ pub struct Command {
     pub c_type: CommandType,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Hash, Default)]
-pub struct ActionInfo {
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Default)]
+pub struct ActionReqs {
     requires_auth: bool,
     requires_root: bool,
 }
 
-impl ActionInfo {
+impl ActionReqs {
+    pub fn auth() -> Self {
+        Self::default().with_auth()
+    }
+
+    pub fn root() -> Self {
+        Self::default().with_root()
+    }
+
     pub fn with_auth(mut self) -> Self {
         self.requires_auth = true;
         self
     }
 
     pub fn with_root(mut self) -> Self {
+        self.requires_auth = true;
         self.requires_root = true;
         self
     }
@@ -47,15 +57,45 @@ impl ActionInfo {
 
 // We use repr(i32) here to allow for automatic ordering of the actions
 #[repr(i32)]
-#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Hash)]
-pub enum RunAction {
+#[derive(PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord, Hash)]
+pub enum ActionType {
     ClearCache = 0,
-    Shell(bool) = 2,
+    Login = 1,
+    Shell = 2,
     RunCommand = 3,
 }
 
-impl RunAction {
-    pub fn do_action(run: &Run, config: &Config) {}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Action {
+    a_type: ActionType,
+    reqs: ActionReqs,
+}
+
+impl PartialOrd for Action {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some((other.a_type as i32).cmp(&(self.a_type as i32)))
+    }
+}
+
+impl Ord for Action {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl Action {
+    pub fn new(a_type: ActionType, reqs: ActionReqs) -> Self {
+        Self { a_type, reqs }
+    }
+
+    pub fn do_action(&self, run: &mut Run, config: &Config) -> anyhow::Result<()> {
+        match self.a_type {
+            ActionType::ClearCache => run.cache.clear(),
+            ActionType::Login => todo!(),
+            ActionType::Shell => todo!(),
+            ActionType::RunCommand => todo!(),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
@@ -67,6 +107,7 @@ pub enum Flag {
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
     NoUser,
+    IncorrectExePerms
 }
 
 #[derive(Debug, Clone)]
@@ -93,16 +134,17 @@ impl Error {
 }
 
 #[derive(Debug, Clone)]
-pub struct Run {
-    pub actions: HashMap<RunAction, ActionInfo>,
+pub struct Run<'a> {
+    pub actions: Vec<Action>,
     pub flags: HashSet<Flag>,
     pub cache: Cache,
     pub user: User,
     pub do_as: User,
+    pub config: &'a Config,
 }
 
-impl Run {
-    pub fn create(matches: &ArgMatches, config: &Config) -> Result<Self, Error> {
+impl<'a> Run<'a> {
+    pub fn create(matches: &ArgMatches, config: &'a Config) -> Result<Self, Error> {
         let do_as_arg = matches
             .get_one::<String>("user")
             .expect("No user specified. This should not happen! Please file a bug report");
@@ -126,20 +168,22 @@ impl Run {
             user,
             actions,
             flags,
+            config,
         })
     }
 
-    fn get_actions(matches: &ArgMatches) -> HashMap<RunAction, ActionInfo> {
-        let mut ret = HashMap::new();
+    fn get_actions(matches: &ArgMatches) -> Vec<Action> {
+        let mut ret = Vec::new();
         if matches.get_flag("clear") {
-            ret.insert(RunAction::ClearCache, ActionInfo::default().with_auth());
+            ret.push(Action::new(ActionType::ClearCache, ActionReqs::auth()));
         }
         if matches.get_flag("login") {
-            ret.insert(RunAction::Shell(true), ActionInfo::default().with_auth());
+            ret.push(Action::new(ActionType::Shell, ActionReqs::auth()));
         }
         if matches.get_flag("shell") {
-            ret.insert(RunAction::Shell(false), ActionInfo::default());
+            ret.push(Action::new(ActionType::Login, ActionReqs::auth()));
         }
+        if let Some(cmd) = matches.get_many("command") {}
 
         ret
     }
@@ -156,8 +200,45 @@ impl Run {
         ret
     }
 
-    pub fn do_run(&self) -> Result<()> {
-        let actions = self.actions.iter()
+    pub fn do_run(&mut self) -> Result<(), Error> {
+        let mut actions = self.actions.clone();
+        actions.sort();
+
+        if !self.flags.contains(&Flag::NoCheck) {
+
+        }
+
+        // Actions which require the user logs in
+        let requires_login = actions
+            .iter()
+            .filter(|a| a.reqs.requires_auth)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        // Actions which require the user logs in as root
+        let requires_root = actions
+            .iter()
+            .filter(|a| a.reqs.requires_root)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        // Actions which require no authentication
+        let rest = actions
+            .into_iter()
+            .filter(|a| !requires_root.contains(a) && !requires_login.contains(a))
+            .collect::<Vec<_>>();
+
+        rest.iter().for_each(|a| {a.do_action(self, &self.config);});
+
+        let auth = login_user(self, &self.config, self.config.security.tries);
+        match auth {
+            Ok(true) => 
+        }
+
+        Ok(())
+    }
+
+    fn after_auth() -> Result<(), Error> {
 
     }
 }
