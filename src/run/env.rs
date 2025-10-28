@@ -135,7 +135,9 @@ impl Env {
     }
 
     fn is_var_valid(&self, var: &String) -> bool {
-        self.safe_vars.contains(var) || var.starts_with("LC_")
+        self.safe_vars.contains(var)
+            || var.starts_with("LC_")
+            || (self.set_vars.path.is_none() && var == "PATH")
     }
 
     fn const_vars_to_vec(vars: &[&str]) -> Vec<String> {

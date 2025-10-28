@@ -215,10 +215,10 @@ impl<'a> Run<'a> {
             ret.push(Action::new(ActionType::ClearCache, ActionReqs::auth()));
         }
         if matches.get_flag("login") {
-            ret.push(Action::new(ActionType::Shell, ActionReqs::auth()));
+            ret.push(Action::new(ActionType::Login, ActionReqs::auth()));
         }
         if matches.get_flag("shell") {
-            ret.push(Action::new(ActionType::Login, ActionReqs::auth()));
+            ret.push(Action::new(ActionType::Shell, ActionReqs::auth()));
         }
 
         ret
@@ -226,10 +226,10 @@ impl<'a> Run<'a> {
 
     fn get_flags(matches: &ArgMatches) -> HashSet<Flag> {
         let mut ret = HashSet::new();
-        if let Some(p) = matches.get_one::<bool>("preserve") {
+        if matches.get_flag("preserve") {
             ret.insert(Flag::PreserveVars);
         }
-        if let Some(p) = matches.get_one::<bool>("nocheck") {
+        if matches.get_flag("nocheck") {
             ret.insert(Flag::NoCheck);
         }
 
@@ -239,7 +239,6 @@ impl<'a> Run<'a> {
     pub fn do_run(&mut self) -> anyhow::Result<()> {
         let mut actions = self.actions.clone();
         actions.sort();
-
         if !self.flags.contains(&Flag::NoCheck) && !check_perms(self.config) {
             exit(1);
         }
