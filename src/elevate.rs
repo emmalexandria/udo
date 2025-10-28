@@ -1,5 +1,5 @@
 use anyhow::Result;
-use nix::unistd::{Uid, geteuid, seteuid, setuid};
+use nix::unistd::{Uid, geteuid, seteuid};
 
 #[derive(Debug, Clone)]
 pub struct ElevatedContext {
@@ -9,7 +9,7 @@ pub struct ElevatedContext {
 
 impl ElevatedContext {
     pub fn new(original: Uid, elevated: Uid) -> Self {
-        let mut ret = Self { original, elevated };
+        let ret = Self { original, elevated };
 
         if ret.is_elevated() {
             let _ = ret.restore();
@@ -18,7 +18,7 @@ impl ElevatedContext {
         ret
     }
 
-    pub fn elevate(&mut self) -> Result<()> {
+    pub fn elevate(&self) -> Result<()> {
         if !self.is_elevated() {
             seteuid(self.elevated)?;
         }
@@ -26,7 +26,7 @@ impl ElevatedContext {
         Ok(())
     }
 
-    pub fn restore(&mut self) -> Result<()> {
+    pub fn restore(&self) -> Result<()> {
         if self.is_elevated() {
             seteuid(self.original)?;
         }

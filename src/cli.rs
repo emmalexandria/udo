@@ -10,7 +10,7 @@ pub fn get_cli() -> Command {
                 .trailing_var_arg(true)
                 .num_args(0..)
                 .allow_hyphen_values(true)
-                .required_unless_present_any(["clear"]),
+                .required_unless_present_any(["clear", "shell", "login"]),
         )
         .arg(
             Arg::new("preserve")
@@ -40,48 +40,12 @@ pub fn get_cli() -> Command {
                 .action(ArgAction::SetTrue)
                 .help("Clear the login cache"),
         )
-        .subcommand(
-            command!("--install")
-                .about("Creates config, PAM service, and sets correct permissions binary")
-                .visible_short_flag_alias('I')
-                .arg(Arg::new("pam").short('p').long("pam"))
-                .arg(Arg::new("config").short('c').long("config")),
+        .arg(Arg::new("shell").short('s').long("shell").num_args(0..1))
+        .arg(
+            Arg::new("login")
+                .short('l')
+                .long("login")
+                .conflicts_with("shell")
+                .action(ArgAction::SetTrue),
         )
-        .subcommand(
-            command!("--shell")
-                .about("Runs a shell as the given user, optionally imitating a login")
-                .visible_short_flag_alias('s')
-                .arg(
-                    Arg::new("login")
-                        .help("Imitate a full login as the given user")
-                        .short('l')
-                        .long("login")
-                        .action(ArgAction::SetTrue),
-                )
-                .arg(
-                    Arg::new("shell")
-                        .short('s')
-                        .long("s")
-                        .help("Override the launched shell (with full path)"),
-                ),
-        )
-        .subcommand(
-            command!("--config")
-                .about("Manage your udo config")
-                .visible_short_flag_alias('C')
-                .arg(
-                    Arg::new("print")
-                        .short('p')
-                        .long("print")
-                        .action(ArgAction::SetTrue),
-                )
-                .arg(
-                    Arg::new("validate")
-                        .short('v')
-                        .long("validate")
-                        .num_args(0..1)
-                        .default_missing_value("/etc/udo/config.toml"),
-                ),
-        )
-        .subcommand_negates_reqs(true)
 }

@@ -1,4 +1,5 @@
 use std::{
+    fs::OpenOptions,
     io::{self, Write, stdout},
     process,
 };
@@ -7,7 +8,7 @@ use crossterm::{
     cursor::MoveToColumn,
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
-    style::{ContentStyle, Stylize},
+    style::{ContentStyle, Print, Stylize},
     terminal::{Clear, ClearType},
 };
 
@@ -67,19 +68,20 @@ impl InputPrompt {
         let mut content = String::new();
         let mut running = true;
         let mut stdout = stdout();
+        let mut tty = OpenOptions::new().read(true).write(true).open("/dev/tty")?;
 
-        execute!(stdout, MoveToColumn(0))?;
+        execute!(tty, MoveToColumn(0))?;
 
         while running {
             if let Some(p) = &self.prompt {
-                print!("{p} ")
+                execute!(tty, Print(p))?;
             }
 
             if self.obscure && self.display_pw {
                 let obscured: String = (0..content.len()).map(|_| self.char).collect();
-                print!("{obscured}");
+                execute!(tty, Print(format!(" {obscured}")))?;
             } else if self.display_pw {
-                print!("{content}");
+                execute!(tty, Print(format!(" {content}")))?;
             }
 
             stdout.flush()?;
@@ -99,12 +101,12 @@ impl InputPrompt {
             }
 
             if running {
-                execute!(stdout, Clear(ClearType::CurrentLine))?;
+                execute!(tty, Clear(ClearType::CurrentLine))?;
             } else {
-                println!();
+                execute!(tty, Print("\n"))?;
             }
 
-            execute!(stdout, MoveToColumn(0))?;
+            execute!(tty, MoveToColumn(0))?;
         }
 
         Ok(content)
