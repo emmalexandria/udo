@@ -104,7 +104,7 @@ impl Cache {
         self.context.restore()?;
 
         let time_valid = time.num_minutes() - entry.timestamp < config.security.timeout;
-        let user_valid = entry.uid == run.user.uid.as_raw();
+        let user_valid = entry.uid == run.do_as.uid.as_raw();
 
         Ok(time_valid && user_valid)
     }
@@ -138,6 +138,6 @@ impl TryFrom<&Run<'_>> for CacheEntry {
 
     fn try_from(run: &Run) -> std::result::Result<Self, Self::Error> {
         let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
-        Ok(CacheEntry::new(time.num_seconds(), run.do_as.uid.as_raw()))
+        Ok(CacheEntry::new(time.num_minutes(), run.do_as.uid.as_raw()))
     }
 }

@@ -321,6 +321,8 @@ impl<'a> Run<'a> {
     }
 
     fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
+        self.cache.create_dir()?;
+        self.cache.cache_run(self)?;
         for action in login {
             let res = action.do_action(self, self.config);
 
