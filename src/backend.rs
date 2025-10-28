@@ -8,51 +8,65 @@
 mod system;
 mod testing;
 
-use std::io;
+use std::fmt::Display;
 
 use nix::unistd::{Gid, Uid};
 
-pub trait Backend {
-    fn getuid() -> Uid;
-    fn setuid(uid: Uid) -> io::Result<()>;
-
-    fn geteuid() -> Uid;
-    fn seteuid(uid: Uid) -> io::Result<()>;
-
-    fn getgid() -> Gid;
-    fn setgid(uid: Gid) -> io::Result<()>;
+#[derive(Debug, Clone)]
+pub enum ErrorKind {
+    UidSet,
+    EuidSet,
+    GidSet,
+    InvalidString,
 }
 
-/// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
-/// but it aims to simulate *enough* to verify that udo has the expected behaviour
-pub struct TestingBackend {}
-
-/// This is a [Backend] used for running udo. It interacts directly with the system
-/// it is running on, and all actions performed on it reflect directly on the system
-pub struct SystemBackend {}
-
-impl Backend for SystemBackend {
-    fn getuid() -> Uid {
-        nix::unistd::getuid()
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::UidSet => "UID_SET",
+            Self::EuidSet => "EUID_SET",
+            Self::GidSet => "GID_SET",
+            Self::InvalidString => "INVALID_STRING",
+        })
     }
+}
 
-    fn setuid(uid: Uid) -> io::Result<()> {
-        todo!()
-    }
+#[derive(Debug, Clone)]
+pub struct Error {
+    pub kind: ErrorKind,
+    pub message: String,
+}
 
-    fn geteuid() -> Uid {
-        nix::unistd::geteuid()
-    }
+impl std::error::Error for Error {}
 
-    fn seteuid(uid: Uid) -> io::Result<()> {
-        todo!()
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.message, self.kind)
     }
+}
 
-    fn getgid() -> Gid {
-        nix::unistd::getgid()
+impl Error {
+    pub fn new<S: ToString>(kind: ErrorKind, message: S) -> Self {
+        Self {
+            kind,
+            message: message.to_string(),
+        }
     }
+}
 
-    fn setgid(uid: Gid) -> io::Result<()> {
-        todo!()
-    }
+pub type Result<T> = std::result::Result<T, Error>;
+
+pub trait Backend {
+    fn new() -> Self;
+
+    fn getuid(&self) -> Uid;
+    fn setuid(&mut self, uid: Uid) -> Result<()>;
+
+    fn geteuid(&self) -> Uid;
+    fn seteuid(&mut self, uid: Uid) -> Result<()>;
+
+    fn getgid(&self) -> Gid;
+    fn setgid(&mut self, uid: Gid) -> Result<()>;
+
+    fn execvp<S: AsRef<str>>(&self, process: S, args: &[S]) -> Result<()>;
 }
