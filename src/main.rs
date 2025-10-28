@@ -1,5 +1,6 @@
 use std::{fs::OpenOptions, io::Write, process::exit};
 
+use clap_help::Printer;
 use crossterm::style::force_color_output;
 
 use crate::{cli::get_cli, config::Config, run::Run};
@@ -31,6 +32,11 @@ fn main() {
 
     if !config.display.color {
         force_color_output(false);
+    }
+
+    if matches.get_flag("help") {
+        Printer::new(get_cli()).print_help();
+        exit(0)
     }
 
     let run = Run::create(&matches, &config);
