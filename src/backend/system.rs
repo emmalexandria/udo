@@ -9,13 +9,10 @@ use crate::backend::{Backend, Error, ErrorKind, Result};
 
 /// This is a [Backend] used for running udo. It interacts directly with the system
 /// it is running on, and all actions performed on it reflect directly on the system
+#[derive(Eq, PartialEq, Clone)]
 pub struct SystemBackend {}
 
 impl Backend for SystemBackend {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn getuid(&self) -> Uid {
         nix::unistd::getuid()
     }
@@ -40,8 +37,8 @@ impl Backend for SystemBackend {
         setgid(gid).map_err(|e| Error::new(ErrorKind::GidSet, "Failed to set gid"))
     }
 
-    fn execvp<S: AsRef<str>>(&mut self, process: S, args: &[S]) -> Result<()> {
-        let process = CString::new(process.as_ref()).map_err(|_| {
+    fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()> {
+        let process = CString::new(process).map_err(|_| {
             Error::new(
                 ErrorKind::InvalidString,
                 "Failed to convert command to CString",
@@ -52,7 +49,7 @@ impl Backend for SystemBackend {
         let args = args
             .iter()
             .flat_map(|s| {
-                CString::new(s.as_ref()).map_err(|_| {
+                CString::new(s.as_bytes()).map_err(|_| {
                     Error::new(ErrorKind::InvalidString, "Failed to convert arg to CString")
                 })
             })
@@ -66,6 +63,7 @@ impl Backend for SystemBackend {
             )
         })?;
 
-        Ok(())
+        // In theory this function should never return. If it does, something has gone rather wrong
+        Err(Error::new(ErrorKind::Exec, "Failed to execvp"))
     }
 }

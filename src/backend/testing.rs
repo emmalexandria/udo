@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use nix::unistd::{Gid, Uid};
 
-use crate::backend::Backend;
+use crate::backend::{Backend, InitBackend};
 
+#[derive(PartialEq, Eq, Clone)]
 pub struct TestProcess {
     pub name: String,
     pub args: Vec<String>,
@@ -11,6 +12,7 @@ pub struct TestProcess {
 
 /// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
 /// but it aims to simulate *enough* to verify that udo has the expected behaviour
+#[derive(PartialEq, Eq, Clone)]
 pub struct TestingBackend {
     gid: Gid,
     uid: Uid,
@@ -20,7 +22,7 @@ pub struct TestingBackend {
     process: TestProcess,
 }
 
-impl Backend for TestingBackend {
+impl InitBackend for TestingBackend {
     fn new() -> Self {
         // Pretend we're a process run by a normal user with suid and owned by root
         // Choose 512 because it's a nice round number
@@ -36,7 +38,9 @@ impl Backend for TestingBackend {
             },
         }
     }
+}
 
+impl Backend for TestingBackend {
     fn getuid(&self) -> nix::unistd::Uid {
         self.uid
     }
@@ -64,9 +68,9 @@ impl Backend for TestingBackend {
         Ok(())
     }
 
-    fn execvp<S: AsRef<str>>(&mut self, process: S, args: &[S]) -> super::Result<()> {
+    fn execvp(&mut self, process: &str, args: &[&str]) -> super::Result<()> {
         self.process = TestProcess {
-            name: process.as_ref().to_string(),
+            name: process.to_string(),
             args: args
                 .iter()
                 .map(|s| s.as_ref())

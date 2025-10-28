@@ -2,7 +2,12 @@ use std::process::exit;
 
 use crossterm::style::force_color_output;
 
-use crate::{cli::get_cli, config::Config, run::Run};
+use crate::{
+    backend::{Backend, system::SystemBackend},
+    cli::get_cli,
+    config::Config,
+    run::Run,
+};
 
 mod authenticate;
 mod backend;
@@ -34,7 +39,7 @@ fn main() {
         force_color_output(false);
     }
 
-    let run = Run::create(&matches, &config);
+    let run = Run::create(&matches, &config, Some(Box::new(SystemBackend {})));
     match run {
         Ok(mut r) => {
             r.do_run();

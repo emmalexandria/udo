@@ -5,8 +5,8 @@
 * system and is used at runtime, and the other creates a very basic fake of a unix system for testing.
 */
 
-mod system;
-mod testing;
+pub mod system;
+pub mod testing;
 
 use std::fmt::Display;
 
@@ -58,9 +58,11 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait Backend {
+pub trait InitBackend {
     fn new() -> Self;
+}
 
+pub trait Backend {
     fn getuid(&self) -> Uid;
     fn setuid(&mut self, uid: Uid) -> Result<()>;
 
@@ -70,5 +72,5 @@ pub trait Backend {
     fn getgid(&self) -> Gid;
     fn setgid(&mut self, uid: Gid) -> Result<()>;
 
-    fn execvp<S: AsRef<str>>(&mut self, process: S, args: &[S]) -> Result<()>;
+    fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()>;
 }

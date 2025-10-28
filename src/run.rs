@@ -2,6 +2,7 @@ use std::{collections::HashSet, fmt::Display};
 
 use crate::{
     authenticate::{AuthResult, authenticate_password},
+    backend::{self, Backend, system::SystemBackend},
     cache::Cache,
     config::Config,
     output::{self, prompt_password, wrong_password},
@@ -162,8 +163,8 @@ impl Error {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct Run<'a> {
+    backend: Box<dyn Backend>,
     pub actions: Vec<Action>,
     pub flags: HashSet<Flag>,
     pub command: Option<Vec<String>>,
@@ -174,7 +175,11 @@ pub struct Run<'a> {
 }
 
 impl<'a> Run<'a> {
-    pub fn create(matches: &ArgMatches, config: &'a Config) -> Result<Self, Error> {
+    pub fn create(
+        matches: &ArgMatches,
+        config: &'a Config,
+        backend: Option<Box<dyn Backend>>,
+    ) -> Result<Self, Error> {
         let do_as_arg = matches
             .get_one::<String>("user")
             .expect("No user specified. This should not happen! Please file a bug report");
@@ -198,7 +203,10 @@ impl<'a> Run<'a> {
             actions.push(Action::new(ActionType::RunCommand, ActionReqs::auth()));
         }
 
+        let backend = backend.unwrap_or(Box::new(SystemBackend {}));
+
         Ok(Self {
+            backend,
             command,
             cache,
             do_as,
