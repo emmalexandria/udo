@@ -5,6 +5,9 @@
 * system and is used at runtime, and the other creates a very basic fake of a unix system for testing.
 */
 
+mod system;
+mod testing;
+
 use std::io;
 
 use nix::unistd::{Gid, Uid};
