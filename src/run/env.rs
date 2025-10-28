@@ -1,6 +1,9 @@
 use std::env;
 
-use nix::unistd::{User, setuid};
+use nix::{
+    sys::stat::{Mode, umask},
+    unistd::{User, setgid, setuid},
+};
 
 use anyhow::Result;
 
@@ -95,12 +98,14 @@ impl Env {
     }
 
     pub unsafe fn elevate_final(&self) -> Result<()> {
+        setgid(self.do_as.gid)?;
         setuid(self.do_as.uid)?;
         Ok(())
     }
 
     pub unsafe fn apply(&self) -> Result<()> {
         unsafe {
+            umask(Mode::from_bits_truncate(0o022));
             self.apply_vars();
             self.elevate_final()?;
         }
@@ -122,15 +127,15 @@ impl Env {
                         env::remove_var(var);
                     }
                 }
-            }
 
-            if let Some(p) = &self.set_vars.path {
-                env::set_var("PATH", p);
+                if let Some(p) = &self.set_vars.path {
+                    env::set_var("PATH", p);
+                }
+                env::set_var("HOME", &self.set_vars.home);
+                env::set_var("SHELL", &self.set_vars.shell);
+                env::set_var("USER", &self.set_vars.user);
+                env::set_var("LOGNAME", &self.set_vars.logname);
             }
-            env::set_var("HOME", &self.set_vars.home);
-            env::set_var("SHELL", &self.set_vars.shell);
-            env::set_var("USER", &self.set_vars.user);
-            env::set_var("LOGNAME", &self.set_vars.logname);
         }
     }
 
