@@ -9,8 +9,8 @@ pub fn get_cli() -> Command {
                 .trailing_var_arg(true)
                 .num_args(0..)
                 .allow_hyphen_values(true)
-                .required_unless_present_any(["clear", "run-shell"])
-                .conflicts_with_all(["run-shell"]),
+                .required_unless_present_any(["clear", "shell", "login"])
+                .conflicts_with_all(["shell", "login"]),
         )
         .arg(
             Arg::new("preserve")
@@ -51,5 +51,4 @@ pub fn get_cli() -> Command {
                 .conflicts_with("shell")
                 .action(ArgAction::SetTrue),
         )
-            .group(ArgGroup::new("run-shell").args(["login", "shell"]))
 }
