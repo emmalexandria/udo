@@ -67,8 +67,7 @@ Options:
 
 ### A Word of Warning
 
-I am not really a Unix developer, nor am I used to writing secure tools. This tool was created for my own use and as a learning exercise. I do have an interest in making it better for general usage, but I don't know where to start. If you use udo, please be aware that it probably **_will_** break, have vulnerabilities,
-fail to execute commands correctly, and more. This will be the case until it reaches `v1.0.0`
+I am not really a Unix developer, nor am I used to writing secure tools. This tool was created for my own use and as a learning exercise. I do have an interest in making it better for general usage, but I don't know where to start. If you use udo, please be aware that it probably **_will_** break, have vulnerabilities, fail to execute commands correctly, and more. This will be the case until it reaches `v1.0.0`
 
 I would like udo to be robust enough that it can be the sole `suid` tool installed on some systems _some day_ but it is nowhere near that point. In addition, by installing it you are probably increasing your attack surface dramatically. I'm proud of this piece of software, but it is still very much a work in progress.
 
