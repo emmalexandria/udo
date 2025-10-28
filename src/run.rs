@@ -81,7 +81,7 @@ impl Display for Action {
 
 impl PartialOrd for Action {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some((other.a_type as i32).cmp(&(self.a_type as i32)))
+        Some((self.a_type as i32).cmp(&(other.a_type as i32)))
     }
 }
 

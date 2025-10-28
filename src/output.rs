@@ -13,6 +13,10 @@ use crate::{config::Config, output::prompt::InputPrompt};
 pub mod prompt;
 pub mod theme;
 
+/// BLOCK_LEN represents the length of the longest box in our output, being the password box.
+/// This is used to pad our other output
+const BLOCK_LEN: usize = 20;
+
 #[derive(Clone, Debug, Copy)]
 pub enum Output {
     Stdout,
@@ -52,10 +56,19 @@ pub fn prompt_password(config: &Config) -> Result<String> {
 }
 
 fn block(style: &ContentStyle, name: &str, icon: &str) -> MultiStyled<String> {
-    MultiStyled::default()
+    let mut block = MultiStyled::default()
         .with(style.apply(format!(" {icon} ")))
         .with(style.apply("[udo]".to_string()).bold())
-        .with(style.apply(format!(" {name} ")))
+        .with(style.apply(format!(" {name} ")));
+
+    if BLOCK_LEN > block.len() {
+        let remaining = BLOCK_LEN - block.len();
+        let pad = (0..remaining).map(|_| ' ').collect::<String>();
+
+        block.push(style.apply(pad));
+    }
+
+    block
 }
 
 pub fn error<D: Display>(error: D, icon: bool, output: Option<Output>) {
@@ -68,7 +81,7 @@ pub fn error<D: Display>(error: D, icon: bool, output: Option<Output>) {
     let block = block(&style, "Error", &icon.to_string());
     let output = output.unwrap_or(Output::Stderr);
 
-    execute!(output.get_write(), Print(format!("{block} {error}")));
+    execute!(output.get_write(), Print(format!("{block} {error}\n")));
 }
 
 pub fn error_with_details<S: Display, E: Display>(
@@ -100,7 +113,7 @@ pub fn error_with_details<S: Display, E: Display>(
     let content = details_style.apply(padded_lines);
     let output = output.unwrap_or(Output::Stderr);
 
-    execute!(output.get_write(), Print(content));
+    execute!(output.get_write(), Print(content), Print("\n"));
 }
 
 pub fn info<D: Display>(info: D, icon: bool, output: Option<Output>) {
@@ -113,7 +126,7 @@ pub fn info<D: Display>(info: D, icon: bool, output: Option<Output>) {
     let block = block(&style, "Info", &icon.to_string());
 
     let output = output.unwrap_or(Output::Stderr);
-    execute!(output.get_write(), Print(format!("{block} {info}")));
+    execute!(output.get_write(), Print(format!("{block} {info}\n")));
 }
 
 pub fn wrong_password(icon: bool, tries: usize) {
@@ -155,6 +168,16 @@ impl<D: Display> MultiStyled<D> {
     pub fn with(mut self, content: StyledContent<D>) -> Self {
         self.content.push(content);
         self
+    }
+
+    pub fn push(&mut self, content: StyledContent<D>) {
+        self.content.push(content);
+    }
+
+    pub fn len(&self) -> usize {
+        self.content
+            .iter()
+            .fold(0, |a, c| a + c.content().to_string().len())
     }
 }
 
