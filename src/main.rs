@@ -1,12 +1,8 @@
-use std::process::exit;
+use std::{fs::OpenOptions, io::Write, process::exit};
 
 use crossterm::style::force_color_output;
 
-use crate::{
-    cli::get_cli,
-    config::Config,
-    run::Run,
-};
+use crate::{cli::get_cli, config::Config, run::Run};
 
 mod authenticate;
 mod cache;
@@ -32,6 +28,15 @@ fn main() {
             exit(1)
         }
     };
+
+    let mut tty = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+        .unwrap();
+
+    write!(tty, "Password: ");
+    tty.flush();
 
     if !config.display.color {
         force_color_output(false);
