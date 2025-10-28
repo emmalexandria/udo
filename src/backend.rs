@@ -19,6 +19,7 @@ pub enum ErrorKind {
     GidSet,
     InvalidString,
     Exec,
+    Env,
 }
 
 impl Display for ErrorKind {
@@ -29,6 +30,7 @@ impl Display for ErrorKind {
             Self::GidSet => "GID_SET",
             Self::InvalidString => "INVALID_STRING",
             Self::Exec => "EXEC",
+            Self::Env => "ENV",
         })
     }
 }
@@ -73,4 +75,7 @@ pub trait Backend {
     fn setgid(&mut self, uid: Gid) -> Result<()>;
 
     fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()>;
+
+    fn get_env(&self, name: &str) -> Result<String>;
+    unsafe fn set_env(&mut self, name: &str, value: &str);
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use nix::unistd::{Gid, Uid};
 
-use crate::backend::{Backend, InitBackend};
+use crate::backend::{Backend, Error, ErrorKind, InitBackend};
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct TestProcess {
@@ -79,5 +79,23 @@ impl Backend for TestingBackend {
         };
 
         Ok(())
+    }
+
+    fn get_env(&self, name: &str) -> super::Result<String> {
+        let env = self.env.get(name);
+        let res = env.ok_or(Error::new(
+            ErrorKind::Env,
+            "Failed to read environment variable. Is it set?",
+        ))?;
+
+        Ok(res.clone())
+    }
+
+    // In our simulated env, this call can never fail
+    unsafe fn set_env(&mut self, name: &str, value: &str) {
+        if self.env.contains_key(name) {
+            self.env.remove(name);
+        }
+        self.env.insert(name.to_string(), value.to_string());
     }
 }

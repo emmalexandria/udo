@@ -1,4 +1,5 @@
 use std::{
+    env,
     ffi::{CStr, CString},
     io,
 };
@@ -65,5 +66,16 @@ impl Backend for SystemBackend {
 
         // In theory this function should never return. If it does, something has gone rather wrong
         Err(Error::new(ErrorKind::Exec, "Failed to execvp"))
+    }
+
+    fn get_env(&self, name: &str) -> Result<String> {
+        Ok(env::var(name)
+            .map_err(|e| Error::new(ErrorKind::Env, "Failed to get environment variable"))?)
+    }
+
+    unsafe fn set_env(&mut self, name: &str, value: &str) {
+        unsafe {
+            env::set_var(name, value);
+        }
     }
 }
