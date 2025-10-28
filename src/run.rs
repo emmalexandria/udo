@@ -4,7 +4,7 @@ use crate::{
     authenticate::{AuthResult, authenticate_password},
     cache::Cache,
     config::Config,
-    output::{self, lockout, prompt_password, wrong_password},
+    output::{self, prompt_password, wrong_password},
     run::{env::Env, process::run_process},
     user::{get_root_user, get_user, get_user_by_id},
 };
@@ -98,7 +98,16 @@ impl Action {
 
     pub fn do_action(&self, run: &mut Run, config: &Config) -> anyhow::Result<()> {
         match self.a_type {
-            ActionType::ClearCache => run.cache.clear(),
+            ActionType::ClearCache => {
+                let ret = run.cache.clear();
+                output::info(
+                    format!("Cleared cache for user \"{}\"", run.user.name),
+                    config.display.nerd,
+                    None,
+                );
+
+                ret
+            }
             ActionType::Login => todo!(),
             ActionType::Shell => todo!(),
             ActionType::RunCommand => {
@@ -250,10 +259,13 @@ impl<'a> Run<'a> {
         let auth = self.login_user(self.config.security.tries);
         match auth {
             Ok(true) => self.after_auth(requires_login, requires_root)?,
-            Ok(false) => output::info("Login failed", self.config.display.nerd),
-            Err(e) => {
-                output::error_with_details("Error while logging in", e, self.config.display.nerd)
-            }
+            Ok(false) => output::info("Login failed", self.config.display.nerd, None),
+            Err(e) => output::error_with_details(
+                "Error while logging in",
+                e,
+                self.config.display.nerd,
+                None,
+            ),
         }
 
         Ok(())
@@ -266,6 +278,7 @@ impl<'a> Run<'a> {
             Err(e) => output::error(
                 format!("Failed to check cache ({e}). Requesting password"),
                 self.config.display.nerd,
+                None,
             ),
         }
 
@@ -274,6 +287,7 @@ impl<'a> Run<'a> {
             output::error(
                 format!("Failed to display password prompt ({e}"),
                 self.config.display.nerd,
+                None,
             )
         }
 
@@ -284,7 +298,6 @@ impl<'a> Run<'a> {
                     wrong_password(self.config.display.nerd, tries - 1);
                     self.login_user(tries - 1)
                 } else {
-                    lockout(self.config);
                     Ok(false)
                 }
             }
@@ -293,6 +306,7 @@ impl<'a> Run<'a> {
                     "Authentication with PAM failed",
                     s,
                     self.config.display.nerd,
+                    None,
                 );
                 Ok(false)
             }
@@ -300,8 +314,6 @@ impl<'a> Run<'a> {
     }
 
     fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
-        !self.do_as.uid.is_root();
-
         for action in login {
             let res = action.do_action(self, self.config);
 
@@ -310,6 +322,7 @@ impl<'a> Run<'a> {
                     format!("Unable to perform {action}"),
                     res.err().unwrap(),
                     self.config.display.nerd,
+                    None,
                 );
             }
         }
@@ -326,13 +339,13 @@ fn check_perms(config: &Config) -> bool {
 
     let owner = Uid::from_raw(st.st_uid);
     if !owner.is_root() {
-        output::error("udo is not owned by root", config.display.nerd);
+        output::error("udo is not owned by root", config.display.nerd, None);
         valid = false;
     }
 
     let perms = Mode::from_bits_truncate(st.st_mode);
     if !perms.contains(Mode::S_ISUID) {
-        output::error("udo does not have suid perms", config.display.nerd);
+        output::error("udo does not have suid perms", config.display.nerd, None);
         valid = false;
     }
 

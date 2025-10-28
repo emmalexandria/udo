@@ -1,8 +1,9 @@
-use std::fmt::Display;
+use std::{fmt::Display, fs::OpenOptions, io};
 
 use anyhow::Result;
 use crossterm::{
-    style::{ContentStyle, StyledContent, Stylize},
+    execute,
+    style::{ContentStyle, Print, StyledContent, Stylize},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use nix::unistd::User;
@@ -11,6 +12,30 @@ use crate::{config::Config, output::prompt::InputPrompt};
 
 pub mod prompt;
 pub mod theme;
+
+#[derive(Clone, Debug, Copy)]
+pub enum Output {
+    Stdout,
+    Stderr,
+    Tty,
+}
+
+impl Output {
+    pub fn get_write(&self) -> Box<dyn io::Write> {
+        match self {
+            Output::Stdout => Box::new(io::stdout()),
+            Output::Stderr => Box::new(io::stderr()),
+            Output::Tty => {
+                let fd = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open("/dev/tty")
+                    .expect("Could not open /dev/tty");
+                Box::new(fd)
+            }
+        }
+    }
+}
 
 pub fn prompt_password(config: &Config) -> Result<String> {
     enable_raw_mode()?;
@@ -33,7 +58,7 @@ fn block(style: &ContentStyle, name: &str, icon: &str) -> MultiStyled<String> {
         .with(style.apply(format!(" {name} ")))
 }
 
-pub fn error<D: Display>(error: D, icon: bool) {
+pub fn error<D: Display>(error: D, icon: bool, output: Option<Output>) {
     let icon = match icon {
         true => '',
         false => '!',
@@ -41,12 +66,18 @@ pub fn error<D: Display>(error: D, icon: bool) {
 
     let style = ContentStyle::default().on_red().black();
     let block = block(&style, "Error", &icon.to_string());
+    let output = output.unwrap_or(Output::Stderr);
 
-    eprintln!("{block} {error}");
+    execute!(output.get_write(), Print(format!("{block} {error}")));
 }
 
-pub fn error_with_details<S: Display, E: Display>(message: S, details: E, icon: bool) {
-    error(message, icon);
+pub fn error_with_details<S: Display, E: Display>(
+    message: S,
+    details: E,
+    icon: bool,
+    output: Option<Output>,
+) {
+    error(message, icon, output);
     let details_style = ContentStyle::default().on_black();
     let details = details.to_string();
     let lines = details.lines().collect::<Vec<_>>();
@@ -67,10 +98,12 @@ pub fn error_with_details<S: Display, E: Display>(message: S, details: E, icon: 
         .collect::<Vec<_>>()
         .join("\n");
     let content = details_style.apply(padded_lines);
-    eprintln!("{content}");
+    let output = output.unwrap_or(Output::Stderr);
+
+    execute!(output.get_write(), Print(content));
 }
 
-pub fn info<D: Display>(info: D, icon: bool) {
+pub fn info<D: Display>(info: D, icon: bool, output: Option<Output>) {
     let icon = match icon {
         true => '',
         false => '#',
@@ -79,7 +112,8 @@ pub fn info<D: Display>(info: D, icon: bool) {
     let style = ContentStyle::default().on_blue().black();
     let block = block(&style, "Info", &icon.to_string());
 
-    println!("{block} {info}");
+    let output = output.unwrap_or(Output::Stderr);
+    execute!(output.get_write(), Print(format!("{block} {info}")));
 }
 
 pub fn wrong_password(icon: bool, tries: usize) {
@@ -93,7 +127,7 @@ pub fn wrong_password(icon: bool, tries: usize) {
 
     let try_text = if tries > 1 { "tries" } else { "try" };
 
-    println!("{block} Incorrect. {tries} {try_text} remaining.")
+    eprintln!("{block} Incorrect. {tries} {try_text} remaining.")
 }
 
 pub fn not_authenticated(user: &User, config: &Config) {
@@ -107,14 +141,6 @@ pub fn not_authenticated(user: &User, config: &Config) {
     );
 
     eprintln!("{multi}")
-}
-
-pub fn lockout(config: &Config) {
-    let lock = format!("{} incorrect password attempts", config.security.tries)
-        .stylize()
-        .yellow()
-        .bold();
-    println!("{lock}");
 }
 
 #[derive(Default, Debug, Clone)]

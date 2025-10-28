@@ -67,13 +67,15 @@ impl Config {
         let mut content: Option<String> = None;
         match fs::read_to_string(CONFIG_PATH) {
             Ok(f) => content = Some(f),
-            Err(e) => output::error(format!("Failed to read config file ({e})"), false),
+            Err(e) => output::error(format!("Failed to read config file ({e})"), false, None),
         };
 
         if let Some(c) = &content {
             match toml::Deserializer::parse(c) {
                 Ok(d) => de = Some(d),
-                Err(e) => output::error(format!("Failed to create deserializer ({e})"), false),
+                Err(e) => {
+                    output::error(format!("Failed to create deserializer ({e})"), false, None)
+                }
             }
         }
 

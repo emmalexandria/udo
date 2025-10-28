@@ -20,7 +20,7 @@ fn main() {
     let config = match Config::read() {
         Ok(c) => c,
         Err(e) => {
-            output::error_with_details("Config error", e, false);
+            output::error_with_details("Config error", e, false, None);
             println!("In future, please consider using udoedit");
             println!(
                 "Use sudo/doas to fix the config file, or chroot into your system from a live system."
@@ -38,6 +38,8 @@ fn main() {
         Ok(mut r) => {
             r.do_run();
         }
-        Err(e) => output::error_with_details("Failed to initialise run", e, config.display.nerd),
+        Err(e) => {
+            output::error_with_details("Failed to initialise run", e, config.display.nerd, None)
+        }
     }
 }
