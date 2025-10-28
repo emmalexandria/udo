@@ -9,7 +9,7 @@ pub fn get_cli() -> Command {
                 .trailing_var_arg(true)
                 .num_args(0..)
                 .allow_hyphen_values(true)
-                .required_unless_present_any(["clear"])
+                .required_unless_present_any(["clear", "run-shell"])
                 .conflicts_with_all(["run-shell"]),
         )
         .arg(
