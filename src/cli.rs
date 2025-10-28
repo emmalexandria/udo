@@ -44,7 +44,7 @@ pub fn get_cli() -> Command {
                 .action(ArgAction::SetTrue)
                 .help("Clear the login cache"),
         )
-        .arg(Arg::new("shell").short('s').long("shell").num_args(1).default_value("PASSWD").value_name("shell").help("Creates a shell as root, preserving $HOME"))
+        .arg(Arg::new("shell").short('s').long("shell").help("Creates a shell as root, preserving $HOME").action(ArgAction::SetTrue))
         .arg(
             Arg::new("login")
                 .short('l')
