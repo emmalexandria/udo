@@ -16,7 +16,7 @@ _If you take interest in udo, please read the [Word of Warning](#a-word-of-warni
 
 ### Motivation
 
-The primary motivation for udo was for my own usage. I wanted a suid tool which had nice output, easy to understand configuration, and which provided a modern CLI. I decided to release it because I figured I couldn't be the _only_ one. doas is nice in that it's far more simple than sudo, but it's still _boring_. I doubt this will be a common sentiment — most people want their suid tool to be boring.
+The main motivation for udo was for my own usage. I wanted a suid tool which had nice output, easy to understand configuration, and which provided a modern CLI. I decided to release it because I figured I couldn't be the _only_ one. doas is nice in that it's far more simple than sudo, but it's still _boring_. I doubt this will be a common sentiment — most people want their suid tool to be boring.
 
 #### Goals
 
