@@ -5,6 +5,7 @@ use crossterm::style::force_color_output;
 use crate::{cli::get_cli, config::Config, run::Run};
 
 mod authenticate;
+mod backend;
 mod cache;
 mod cli;
 mod config;
