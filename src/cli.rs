@@ -1,4 +1,4 @@
-use clap::{Arg, ArgAction, ArgGroup, Command, command};
+use clap::{Arg, ArgAction, Command, command};
 
 pub fn get_cli() -> Command {
     command!()

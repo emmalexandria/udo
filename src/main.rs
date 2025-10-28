@@ -1,4 +1,4 @@
-use std::{fs::OpenOptions, io::Write, process::exit};
+use std::process::exit;
 
 use crossterm::style::force_color_output;
 
