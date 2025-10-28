@@ -29,15 +29,6 @@ fn main() {
         }
     };
 
-    let mut tty = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/tty")
-        .unwrap();
-
-    write!(tty, "Password: ");
-    tty.flush();
-
     if !config.display.color {
         force_color_output(false);
     }
