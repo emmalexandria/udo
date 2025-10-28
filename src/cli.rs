@@ -1,10 +1,8 @@
-use clap::{Arg, ArgAction, Command, command};
+use clap::{Arg, ArgAction, ArgGroup, Command, command};
 
 pub fn get_cli() -> Command {
     command!()
         .disable_help_subcommand(true)
-        .disable_help_flag(true)
-        .args_conflicts_with_subcommands(true)
         .arg(
             Arg::new("command")
                 .help("The command to run")
@@ -12,7 +10,7 @@ pub fn get_cli() -> Command {
                 .num_args(0..)
                 .allow_hyphen_values(true)
                 .required_unless_present_any(["clear"])
-                .conflicts_with_all(["shell", "login"]),
+                .conflicts_with_all(["run-shell"]),
         )
         .arg(
             Arg::new("preserve")
@@ -53,5 +51,5 @@ pub fn get_cli() -> Command {
                 .conflicts_with("shell")
                 .action(ArgAction::SetTrue),
         )
-        .arg(Arg::new("help").long("help").short('h').help("Display this help output").action(ArgAction::SetTrue).exclusive(true))
+            .group(ArgGroup::new("run-shell").args(["login", "shell"]))
 }
