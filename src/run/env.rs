@@ -2,7 +2,7 @@ use std::env;
 
 use nix::{
     sys::stat::{Mode, umask},
-    unistd::{User, setgid, setuid},
+    unistd::{Group, Uid, User, getgid, getuid, seteuid, setgid, setuid},
 };
 
 use anyhow::Result;
@@ -98,8 +98,10 @@ impl Env {
     }
 
     pub unsafe fn elevate_final(&self) -> Result<()> {
-        setgid(self.do_as.gid)?;
+        seteuid(Uid::from_raw(0))?;
         setuid(self.do_as.uid)?;
+        setgid(self.do_as.gid)?;
+        println!("{} {}", getuid(), getgid());
         Ok(())
     }
 
