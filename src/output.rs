@@ -101,19 +101,22 @@ pub fn error_with_details<S: Display, E: Display>(
         }
     });
 
+    let left_pad = (0..BLOCK_LEN).map(|_| ' ').collect::<String>();
     let padded_lines = lines
         .iter()
         .map(|l| {
             let diff = longest - l.len();
             let pad = (0..diff).map(|_| ' ').collect::<String>();
-            format!("{l}{pad}")
+            MultiStyled::default()
+                .with(left_pad.clone().stylize())
+                .with(details_style.apply(format!("{l}{pad}")))
         })
-        .collect::<Vec<_>>()
-        .join("\n");
-    let content = details_style.apply(padded_lines);
-    let output = output.unwrap_or(Output::Stderr);
+        .collect::<Vec<_>>();
+    let mut output = output.unwrap_or(Output::Stderr).get_write();
 
-    execute!(output.get_write(), Print(content), Print("\n"));
+    for line in padded_lines {
+        execute!(output, Print(line), Print("\n"));
+    }
 }
 
 pub fn info<D: Display>(info: D, icon: bool, output: Option<Output>) {
