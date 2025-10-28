@@ -18,6 +18,7 @@ pub enum ErrorKind {
     EuidSet,
     GidSet,
     InvalidString,
+    Exec,
 }
 
 impl Display for ErrorKind {
@@ -27,6 +28,7 @@ impl Display for ErrorKind {
             Self::EuidSet => "EUID_SET",
             Self::GidSet => "GID_SET",
             Self::InvalidString => "INVALID_STRING",
+            Self::Exec => "EXEC",
         })
     }
 }
@@ -68,5 +70,5 @@ pub trait Backend {
     fn getgid(&self) -> Gid;
     fn setgid(&mut self, uid: Gid) -> Result<()>;
 
-    fn execvp<S: AsRef<str>>(&self, process: S, args: &[S]) -> Result<()>;
+    fn execvp<S: AsRef<str>>(&mut self, process: S, args: &[S]) -> Result<()>;
 }

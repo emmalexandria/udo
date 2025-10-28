@@ -40,7 +40,7 @@ impl Backend for SystemBackend {
         setgid(gid).map_err(|e| Error::new(ErrorKind::GidSet, "Failed to set gid"))
     }
 
-    fn execvp<S: AsRef<str>>(&self, process: S, args: &[S]) -> Result<()> {
+    fn execvp<S: AsRef<str>>(&mut self, process: S, args: &[S]) -> Result<()> {
         let process = CString::new(process.as_ref()).map_err(|_| {
             Error::new(
                 ErrorKind::InvalidString,
@@ -51,16 +51,20 @@ impl Backend for SystemBackend {
         // Flatten args for now, add error handling in future
         let args = args
             .iter()
-            .map(|s| {
+            .flat_map(|s| {
                 CString::new(s.as_ref()).map_err(|_| {
                     Error::new(ErrorKind::InvalidString, "Failed to convert arg to CString")
                 })
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         let args = args.iter().map(|a| a.as_ref()).collect::<Vec<_>>();
-        execvp(&process, &args);
+        execvp(&process, &args).map_err(|_| {
+            Error::new(
+                ErrorKind::Exec,
+                "Failed to replace process with new process",
+            )
+        })?;
 
         Ok(())
     }

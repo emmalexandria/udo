@@ -1,6 +1,13 @@
+use std::collections::HashMap;
+
 use nix::unistd::{Gid, Uid};
 
 use crate::backend::Backend;
+
+pub struct TestProcess {
+    pub name: String,
+    pub args: Vec<String>,
+}
 
 /// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
 /// but it aims to simulate *enough* to verify that udo has the expected behaviour
@@ -9,6 +16,8 @@ pub struct TestingBackend {
     uid: Uid,
     euid: Uid,
     suid: Uid,
+    env: HashMap<String, String>,
+    process: TestProcess,
 }
 
 impl Backend for TestingBackend {
@@ -20,6 +29,11 @@ impl Backend for TestingBackend {
             gid: Gid::from_raw(0),
             euid: Uid::from_raw(0),
             suid: Uid::from_raw(0),
+            env: HashMap::new(),
+            process: TestProcess {
+                name: "udo".to_string(),
+                args: vec![],
+            },
         }
     }
 
@@ -50,5 +64,16 @@ impl Backend for TestingBackend {
         Ok(())
     }
 
-    fn execvp<S: AsRef<str>>(&self, process: S, args: &[S]) -> super::Result<()> {}
+    fn execvp<S: AsRef<str>>(&mut self, process: S, args: &[S]) -> super::Result<()> {
+        self.process = TestProcess {
+            name: process.as_ref().to_string(),
+            args: args
+                .iter()
+                .map(|s| s.as_ref())
+                .map(str::to_string)
+                .collect(),
+        };
+
+        Ok(())
+    }
 }
