@@ -5,10 +5,10 @@ use crossterm::style::force_color_output;
 use crate::{cli::get_cli, config::Config, run::Run};
 
 mod authenticate;
+mod backend;
 mod cache;
 mod cli;
 mod config;
-mod elevate;
 mod error;
 mod output;
 mod run;
@@ -35,9 +35,12 @@ fn main() {
 
     let run = Run::create(&matches, &config);
     match run {
-        Ok(mut r) => {
-            r.do_run();
-        }
+        Ok(mut r) => match r.do_run() {
+            Ok(_) => {}
+            Err(e) => {
+                output::error_with_details("Could not execute run", e, config.display.nerd, None)
+            }
+        },
         Err(e) => {
             output::error_with_details("Failed to initialise run", e, config.display.nerd, None)
         }

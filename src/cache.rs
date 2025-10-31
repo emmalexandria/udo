@@ -16,21 +16,17 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use toml::Deserializer;
 
-use crate::{config::Config, elevate::ElevatedContext, run::Run};
+use crate::{backend::Backend, config::Config, run::Run};
 
 #[derive(Debug, Clone)]
 pub struct Cache {
-    context: ElevatedContext,
     dir: PathBuf,
 }
 
 impl Cache {
-    pub fn new(user: &User, root: &User) -> Self {
+    pub fn new(user: &User) -> Self {
         let dir = Self::get_dir(user);
-        Self {
-            context: ElevatedContext::new(user.uid, root.uid),
-            dir,
-        }
+        Self { dir }
     }
 
     pub fn get_id(user: &User) -> Result<String> {
@@ -50,8 +46,8 @@ impl Cache {
         path
     }
 
-    pub fn create_dir(&mut self) -> Result<PathBuf> {
-        self.context.elevate()?;
+    pub fn create_dir(&mut self, backend: &mut Box<dyn Backend>) -> Result<PathBuf> {
+        backend.elevate()?;
         if fs::exists(&self.dir)? {
             let md = fs::metadata(&self.dir)?;
             if md.is_dir() {
@@ -62,38 +58,38 @@ impl Cache {
         fs::create_dir_all(&self.dir)?;
         fs::set_permissions(&self.dir, Permissions::from_mode(0o700))?;
         fs::set_permissions(&self.dir, Permissions::from_mode(0o700))?;
-        self.context.restore()?;
+        backend.restore()?;
 
         Ok(self.dir.clone())
     }
 
-    pub fn cache_run(&self, run: &Run) -> Result<()> {
+    pub fn cache_run(&self, run: &mut Run) -> Result<()> {
         let id = Self::get_id(&run.user)?;
         let mut f_path = self.dir.clone();
         f_path.push(id);
 
-        let run = CacheEntry::try_from(run)?;
+        let entry = CacheEntry::try_from(&mut *run)?;
 
         let mut buf = toml::ser::Buffer::new();
         let se = toml::Serializer::new(&mut buf);
-        let out = run.serialize(se)?;
+        let out = entry.serialize(se)?;
 
-        self.context.elevate()?;
+        run.backend.elevate();
         let mut file = File::create(f_path)?;
         file.write_all(out.to_string().as_bytes())?;
-        self.context.restore()?;
+        run.backend.restore();
 
         Ok(())
     }
 
-    pub fn check_cache(&self, run: &Run, config: &Config) -> Result<bool> {
+    pub fn check_cache(&self, run: &mut Run, config: &Config) -> Result<bool> {
         let id = Self::get_id(&run.user)?;
         let mut full = self.dir.clone();
         full.push(id);
 
         let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
 
-        self.context.elevate()?;
+        run.backend.elevate()?;
         if !full.exists() || full.is_dir() {
             return Ok(false);
         }
@@ -101,7 +97,7 @@ impl Cache {
         let content = fs::read_to_string(full)?;
         let de = Deserializer::parse(&content)?;
         let entry = CacheEntry::deserialize(de)?;
-        self.context.restore()?;
+        run.backend.restore()?;
 
         let time_valid = time.num_minutes() - entry.timestamp < config.security.timeout;
         let user_valid = entry.uid == run.do_as.uid.as_raw();
@@ -109,14 +105,14 @@ impl Cache {
         Ok(time_valid && user_valid)
     }
 
-    pub fn clear(&self) -> Result<()> {
-        self.context.elevate()?;
+    pub fn clear(&self, backend: &mut Box<dyn Backend>) -> Result<()> {
+        backend.elevate()?;
 
         if self.dir.exists() && self.dir.is_dir() {
             fs::remove_dir_all(&self.dir)?;
         }
 
-        self.context.restore()?;
+        backend.restore()?;
         Ok(())
     }
 }
@@ -137,6 +133,15 @@ impl TryFrom<&Run<'_>> for CacheEntry {
     type Error = anyhow::Error;
 
     fn try_from(run: &Run) -> std::result::Result<Self, Self::Error> {
+        let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
+        Ok(CacheEntry::new(time.num_minutes(), run.do_as.uid.as_raw()))
+    }
+}
+
+impl TryFrom<&mut Run<'_>> for CacheEntry {
+    type Error = anyhow::Error;
+
+    fn try_from(run: &mut Run<'_>) -> std::result::Result<Self, Self::Error> {
         let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
         Ok(CacheEntry::new(time.num_minutes(), run.do_as.uid.as_raw()))
     }

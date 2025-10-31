@@ -11,7 +11,7 @@ use nix::{
 
 use crate::run::env::Env;
 
-pub fn run_process<S: ToString>(cmd: &[S], env: &Env) -> Result<()> {
+pub fn run_process<S: ToString>(cmd: &[S], env: &mut Env) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     let cmd_name = cmd[0].as_str();
     let args = cmd.iter().map(String::as_str).collect::<Vec<_>>();
@@ -21,7 +21,7 @@ pub fn run_process<S: ToString>(cmd: &[S], env: &Env) -> Result<()> {
     Ok(())
 }
 
-pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &Env) -> Result<()> {
+pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &mut Env) -> Result<()> {
     let cmd_name = name.to_string();
     let mut args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
 
@@ -45,22 +45,21 @@ pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &Env) -> Result<()> 
 fn parent(child: Pid) -> Result<()> {
     match waitpid(child, None) {
         Ok(WaitStatus::Exited(_, status)) => exit(status),
+        // If it was killed by a signal, we exit with 128 + signal, apparently standard Unix
+        // convention
         Ok(WaitStatus::Signaled(_, signal, _)) => exit(128 + signal as i32),
         Ok(status) => exit(1),
-        Err(e) => exit(1),
+        Err(e) => exit(e as i32),
     }
 }
 
-fn child(cmd_name: &str, args: Vec<&str>, env: &Env) -> Result<()> {
-    let program = CString::new(cmd_name)?;
-    let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
-
+fn child(cmd_name: &str, args: Vec<&str>, env: &mut Env) -> Result<()> {
     unsafe {
-        env.apply();
+        env.apply()?;
         umask(Mode::from_bits(0o022).unwrap());
     }
 
-    execvp(&program, &args)?;
+    env.backend.execvp(cmd_name, &args);
 
     Ok(())
 }
