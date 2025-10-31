@@ -137,6 +137,7 @@ impl Action {
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum Flag {
     NoCheck,
+    Preview,
     PreserveVars,
 }
 
@@ -242,6 +243,9 @@ impl<'a> Run<'a> {
         if matches.get_flag("nocheck") {
             ret.insert(Flag::NoCheck);
         }
+        if matches.get_flag("preview") {
+            ret.insert(Flag::Preview);
+        }
 
         ret
     }
@@ -251,6 +255,10 @@ impl<'a> Run<'a> {
         actions.sort();
         if !self.flags.contains(&Flag::NoCheck) && !check_perms(self.config) {
             exit(1);
+        }
+
+        if self.flags.contains(&Flag::Preview) {
+            self.preview();
         }
 
         // Actions which require the user logs in
@@ -352,6 +360,11 @@ impl<'a> Run<'a> {
             }
         }
         Ok(())
+    }
+
+    fn preview(&self) {
+        println!("udo will perform the following actions:");
+        self.actions.iter().for_each(|a| println!("{a}"));
     }
 }
 

@@ -12,6 +12,7 @@ pub fn get_cli() -> Command {
                 .required_unless_present_any(["clear", "shell", "login"])
                 .conflicts_with_all(["shell", "login"]),
         )
+        .arg(Arg::new("preview").short('p').long("preview").action(ArgAction::SetTrue).help("Preview the actions udo will perform and confirm"))
         .arg(
             Arg::new("preserve")
                 .short('e')
