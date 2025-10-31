@@ -6,6 +6,7 @@
 */
 
 pub mod system;
+#[cfg(test)]
 pub mod testing;
 
 use std::fmt::Display;
