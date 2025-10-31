@@ -45,9 +45,11 @@ pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &mut Env) -> Result<
 fn parent(child: Pid) -> Result<()> {
     match waitpid(child, None) {
         Ok(WaitStatus::Exited(_, status)) => exit(status),
+        // If it was killed by a signal, we exit with 128 + signal, apparently standard Unix
+        // convention
         Ok(WaitStatus::Signaled(_, signal, _)) => exit(128 + signal as i32),
         Ok(status) => exit(1),
-        Err(e) => exit(1),
+        Err(e) => exit(e as i32),
     }
 }
 
