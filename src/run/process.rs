@@ -59,7 +59,7 @@ fn child(cmd_name: &str, args: Vec<&str>, env: &mut Env) -> Result<()> {
         umask(Mode::from_bits(0o022).unwrap());
     }
 
-    env.backend.execvp(cmd_name, &args);
+    env.backend.execvp(cmd_name, &args)?;
 
     Ok(())
 }
