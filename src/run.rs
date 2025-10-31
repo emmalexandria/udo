@@ -2,12 +2,12 @@ use std::{collections::HashSet, fmt::Display};
 
 use crate::{
     authenticate::{AuthResult, authenticate_password},
-    backend::{self, Backend, system::SystemBackend},
+    backend::{Backend, system::SystemBackend},
     cache::Cache,
     config::Config,
     output::{self, prompt_password, wrong_password},
     run::{env::Env, process::run_process},
-    user::{get_root_user, get_user, get_user_by_id},
+    user::{get_user, get_user_by_id},
 };
 use clap::ArgMatches;
 use nix::{

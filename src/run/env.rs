@@ -2,7 +2,7 @@ use std::env;
 
 use nix::{
     sys::stat::{Mode, umask},
-    unistd::{Uid, User, getgid, getuid, seteuid, setgid, setuid},
+    unistd::User,
 };
 
 use anyhow::Result;

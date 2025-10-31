@@ -1,10 +1,9 @@
 use std::{
     env,
-    ffi::{CStr, CString},
-    io,
+    ffi::CString,
 };
 
-use nix::unistd::{Gid, Uid, execvp, geteuid, getuid, seteuid, setgid, setuid};
+use nix::unistd::{Gid, Uid, execvp, getuid, seteuid, setgid, setuid};
 
 use crate::backend::{Backend, Error, ErrorKind, Result};
 
@@ -81,8 +80,8 @@ impl Backend for SystemBackend {
     }
 
     fn get_var(&self, name: &str) -> Result<String> {
-        Ok(env::var(name)
-            .map_err(|e| Error::new(ErrorKind::Env, "Failed to get environment variable"))?)
+        env::var(name)
+            .map_err(|e| Error::new(ErrorKind::Env, "Failed to get environment variable"))
     }
 
     unsafe fn set_var(&mut self, name: &str, value: &str) {

@@ -3,7 +3,6 @@ use std::process::exit;
 use crossterm::style::force_color_output;
 
 use crate::{
-    backend::{Backend, system::SystemBackend},
     cli::get_cli,
     config::Config,
     run::Run,
