@@ -16,6 +16,10 @@ pub struct TestProcess {
 pub struct TestBackend {
     /// Stores the group id
     gid: Gid,
+    /// Stores the effective gid,
+    egid: Gid,
+    /// Stores the saved-set gid, necessary for switching egids.
+    sgid: Gid,
     /// Stores the real uid
     uid: Uid,
     /// Stores the effective uid
@@ -31,9 +35,17 @@ impl InitBackend for TestBackend {
         // Pretend we're a process run by a normal user with suid and owned by root
         // Choose 512 because it's a nice round number
         Self {
+            // Nice round uid of 512
             uid: Uid::from_raw(512),
+            // Same for the gid
             gid: Gid::from_raw(512),
+            // We dont run with sgid perms, so its the same
+            egid: Gid::from_raw(512),
+            // Therefore, so is sgid
+            sgid: Gid::from_raw(512),
+            // We do run with suid perms, so thats root
             euid: Uid::from_raw(0),
+            // And therefore so is suid
             suid: Uid::from_raw(0),
             env: HashMap::new(),
             process: TestProcess {
@@ -52,9 +64,14 @@ impl Backend for TestBackend {
     fn setuid(&mut self, uid: nix::unistd::Uid) -> super::Result<()> {
         // In this function we assume the executable always has the suid permissions bit for
         // testing purposes
-        if uid != self.suid {
-            return Err(Error::new(ErrorKind::UidSet, "UID does not match SUID"));
+        if uid != self.suid || !self.euid.is_root() {
+            return Err(Error::new(
+                ErrorKind::UidSet,
+                "UID does not match SUID, and EUID is not root",
+            ));
         }
+
+        // Setting the actual UID also sets the EUID and the SUID.
         self.uid = uid;
         self.euid = uid;
         self.suid = uid;
