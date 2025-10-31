@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env};
 
 use nix::unistd::{Gid, Uid};
 
@@ -117,5 +117,12 @@ impl Backend for TestBackend {
             self.env.remove(name);
         }
         self.env.insert(name.to_string(), value.to_string());
+    }
+
+    fn vars(&self) -> Vec<(String, String)> {
+        self.env
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 }

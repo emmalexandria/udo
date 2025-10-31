@@ -78,4 +78,8 @@ impl Backend for SystemBackend {
             env::set_var(name, value);
         }
     }
+
+    fn vars(&self) -> Vec<(String, String)> {
+        env::vars().collect()
+    }
 }

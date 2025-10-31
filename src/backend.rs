@@ -78,4 +78,6 @@ pub trait Backend {
 
     fn get_env(&self, name: &str) -> Result<String>;
     unsafe fn set_env(&mut self, name: &str, value: &str);
+
+    fn vars(&self) -> Vec<(String, String)>;
 }
