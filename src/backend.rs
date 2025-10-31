@@ -18,6 +18,7 @@ pub enum ErrorKind {
     EuidSet,
     GidSet,
     InvalidString,
+    DoesNotExist,
     Exec,
     Env,
 }
@@ -31,6 +32,7 @@ impl Display for ErrorKind {
             Self::InvalidString => "INVALID_STRING",
             Self::Exec => "EXEC",
             Self::Env => "ENV",
+            Self::DoesNotExist => "DOES_NOT_EXIST",
         })
     }
 }
@@ -82,6 +84,11 @@ pub trait Backend {
     unsafe fn remove_var(&mut self, name: &str);
     /// Get all environment variables as key value pairs
     fn vars(&self) -> Vec<(String, String)>;
+
+    /// Read a file to a string
+    fn read_file(&self, path: &str) -> Result<String>;
+    /// Write a file to a string
+    fn write_file(&mut self, path: &str, content: String) -> Result<()>;
 
     /// Elevate to root for privileged operations
     fn elevate(&mut self) -> Result<()>;

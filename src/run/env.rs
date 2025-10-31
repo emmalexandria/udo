@@ -44,7 +44,7 @@ pub struct Env<'a> {
     pub preserve_all: bool,
     pub safe_vars: Vec<String>,
     pub set_vars: Vars,
-    backend: &'a mut Box<dyn Backend>,
+    pub backend: &'a mut Box<dyn Backend>,
 }
 
 impl<'a> Env<'a> {

@@ -54,15 +54,12 @@ fn parent(child: Pid) -> Result<()> {
 }
 
 fn child(cmd_name: &str, args: Vec<&str>, env: &mut Env) -> Result<()> {
-    let program = CString::new(cmd_name)?;
-    let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
-
     unsafe {
         env.apply()?;
         umask(Mode::from_bits(0o022).unwrap());
     }
 
-    execvp(&program, &args)?;
+    env.backend.execvp(cmd_name, &args);
 
     Ok(())
 }

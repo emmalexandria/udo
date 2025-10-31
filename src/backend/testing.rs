@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 
 use nix::unistd::{Gid, Uid};
 
@@ -24,6 +24,9 @@ pub struct TestBackend {
     original: Uid,
     target: Uid,
     env: HashMap<String, String>,
+    /// Stores an incredibly simplified representation of files (path -> content)
+    /// We don't worry about permissions here, it's simply too much of a PITA.
+    files: HashMap<String, String>,
 }
 
 impl Default for TestBackend {
@@ -50,6 +53,7 @@ impl Default for TestBackend {
             // We default the target user to root for testing purposes
             target: root,
             env: HashMap::new(),
+            files: HashMap::new(),
         }
     }
 }
@@ -148,6 +152,21 @@ impl Backend for TestBackend {
 
     unsafe fn remove_var(&mut self, name: &str) {
         self.env.remove(name);
+    }
+
+    fn read_file(&self, path: &str) -> Result<String> {
+        self.files
+            .get(path)
+            .ok_or(Error::new(
+                ErrorKind::DoesNotExist,
+                "Requested file does not exist",
+            ))
+            .cloned()
+    }
+
+    fn write_file(&mut self, path: &str, content: String) -> Result<()> {
+        self.files.insert(path.to_string(), content);
+        Ok(())
     }
 
     fn is_root(&self) -> bool {

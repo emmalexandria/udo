@@ -1,7 +1,4 @@
-use std::{
-    env,
-    ffi::CString,
-};
+use std::{env, ffi::CString, fs};
 
 use nix::unistd::{Gid, Uid, execvp, getuid, seteuid, setgid, setuid};
 
@@ -80,8 +77,7 @@ impl Backend for SystemBackend {
     }
 
     fn get_var(&self, name: &str) -> Result<String> {
-        env::var(name)
-            .map_err(|e| Error::new(ErrorKind::Env, "Failed to get environment variable"))
+        env::var(name).map_err(|e| Error::new(ErrorKind::Env, "Failed to get environment variable"))
     }
 
     unsafe fn set_var(&mut self, name: &str, value: &str) {
@@ -98,6 +94,24 @@ impl Backend for SystemBackend {
 
     fn vars(&self) -> Vec<(String, String)> {
         env::vars().collect()
+    }
+
+    fn read_file(&self, path: &str) -> Result<String> {
+        fs::read_to_string(path).map_err(|_| {
+            Error::new(
+                ErrorKind::DoesNotExist,
+                "File does not exist or you cannot access it",
+            )
+        })
+    }
+
+    fn write_file(&mut self, path: &str, content: String) -> Result<()> {
+        fs::write(path, content.as_bytes()).map_err(|_| {
+            Error::new(
+                ErrorKind::DoesNotExist,
+                "File does not exist or you cannot access it",
+            )
+        })
     }
 
     fn is_root(&self) -> bool {
