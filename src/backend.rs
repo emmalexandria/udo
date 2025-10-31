@@ -75,9 +75,11 @@ pub trait Backend {
     fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()>;
 
     /// Get an environment variable
-    fn get_env(&self, name: &str) -> Result<String>;
+    fn get_var(&self, name: &str) -> Result<String>;
     /// Set an environment variable
-    unsafe fn set_env(&mut self, name: &str, value: &str);
+    unsafe fn set_var(&mut self, name: &str, value: &str);
+    /// Remove a variable
+    unsafe fn remove_var(&mut self, name: &str);
     /// Get all environment variables as key value pairs
     fn vars(&self) -> Vec<(String, String)>;
 

@@ -11,7 +11,7 @@ use nix::{
 
 use crate::run::env::Env;
 
-pub fn run_process<S: ToString>(cmd: &[S], env: &Env) -> Result<()> {
+pub fn run_process<S: ToString>(cmd: &[S], env: &mut Env) -> Result<()> {
     let cmd = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     let cmd_name = cmd[0].as_str();
     let args = cmd.iter().map(String::as_str).collect::<Vec<_>>();
@@ -21,7 +21,7 @@ pub fn run_process<S: ToString>(cmd: &[S], env: &Env) -> Result<()> {
     Ok(())
 }
 
-pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &Env) -> Result<()> {
+pub fn run_with_args<S: ToString>(name: S, args: &[S], env: &mut Env) -> Result<()> {
     let cmd_name = name.to_string();
     let mut args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
 
@@ -51,7 +51,7 @@ fn parent(child: Pid) -> Result<()> {
     }
 }
 
-fn child(cmd_name: &str, args: Vec<&str>, env: &Env) -> Result<()> {
+fn child(cmd_name: &str, args: Vec<&str>, env: &mut Env) -> Result<()> {
     let program = CString::new(cmd_name)?;
     let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
 

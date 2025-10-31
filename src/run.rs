@@ -115,18 +115,19 @@ impl Action {
                 ret
             }
             ActionType::Login => {
-                let env = Env::login_env(run, config.security.safe_path.as_ref());
                 let shell = run.do_as.shell.to_string_lossy().to_string();
-                run_process(&[shell], &env)
+                let mut env = Env::login_env(run, config.security.safe_path.as_ref());
+                run_process(&[shell], &mut env)
             }
             ActionType::Shell => {
-                let env = Env::non_login_env(run, config.security.safe_path.as_ref());
                 let shell = run.user.shell.to_string_lossy().to_string();
-                run_process(&[shell], &env)
+                let mut env = Env::non_login_env(run, config.security.safe_path.as_ref());
+                run_process(&[shell], &mut env)
             }
             ActionType::RunCommand => {
-                let env = Env::process_env(run, run.config.security.safe_path.as_ref());
-                run_process(&run.command.clone().unwrap(), &env)?;
+                let cmd = run.command.clone();
+                let mut env = Env::process_env(run, run.config.security.safe_path.as_ref());
+                run_process(&cmd.unwrap(), &mut env)?;
                 Ok(())
             }
         }

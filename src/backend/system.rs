@@ -80,14 +80,20 @@ impl Backend for SystemBackend {
         Err(Error::new(ErrorKind::Exec, "Failed to execvp"))
     }
 
-    fn get_env(&self, name: &str) -> Result<String> {
+    fn get_var(&self, name: &str) -> Result<String> {
         Ok(env::var(name)
             .map_err(|e| Error::new(ErrorKind::Env, "Failed to get environment variable"))?)
     }
 
-    unsafe fn set_env(&mut self, name: &str, value: &str) {
+    unsafe fn set_var(&mut self, name: &str, value: &str) {
         unsafe {
             env::set_var(name, value);
+        }
+    }
+
+    unsafe fn remove_var(&mut self, name: &str) {
+        unsafe {
+            env::remove_var(name);
         }
     }
 
@@ -108,6 +114,7 @@ impl Backend for SystemBackend {
     }
 
     fn switch_final(&mut self) -> Result<()> {
+        self.elevate()?;
         self.setuid(self.target)
     }
 }

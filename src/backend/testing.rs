@@ -120,7 +120,7 @@ impl Backend for TestBackend {
         Ok(())
     }
 
-    fn get_env(&self, name: &str) -> super::Result<String> {
+    fn get_var(&self, name: &str) -> super::Result<String> {
         let env = self.env.get(name);
         let res = env.ok_or(Error::new(
             ErrorKind::Env,
@@ -132,7 +132,7 @@ impl Backend for TestBackend {
 
     // In our simulated Unix environment, this call can never fail. It's still unsafe because that's
     // what we define in the trait, but it doesn't have to be.
-    unsafe fn set_env(&mut self, name: &str, value: &str) {
+    unsafe fn set_var(&mut self, name: &str, value: &str) {
         if self.env.contains_key(name) {
             self.env.remove(name);
         }
@@ -144,6 +144,10 @@ impl Backend for TestBackend {
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
+    }
+
+    unsafe fn remove_var(&mut self, name: &str) {
+        self.env.remove(name);
     }
 
     fn is_root(&self) -> bool {
@@ -159,6 +163,7 @@ impl Backend for TestBackend {
     }
 
     fn switch_final(&mut self) -> Result<()> {
+        self.elevate()?;
         self.setuid(self.target)
     }
 }
