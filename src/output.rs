@@ -10,6 +10,7 @@ use nix::unistd::User;
 
 use crate::{config::Config, output::prompt::InputPrompt};
 
+pub mod confirm;
 pub mod prompt;
 pub mod theme;
 

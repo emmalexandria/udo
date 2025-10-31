@@ -67,7 +67,6 @@ impl InputPrompt {
     pub fn run(&self) -> io::Result<String> {
         let mut content = String::new();
         let mut running = true;
-        let mut stdout = stdout();
         let mut tty = OpenOptions::new().read(true).write(true).open("/dev/tty")?;
 
         execute!(tty, MoveToColumn(0))?;
@@ -84,7 +83,7 @@ impl InputPrompt {
                 execute!(tty, Print(format!(" {content}")))?;
             }
 
-            stdout.flush()?;
+            tty.flush()?;
 
             if let Event::Key(e) = event::read()? {
                 match (e.code, e.modifiers) {

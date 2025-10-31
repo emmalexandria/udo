@@ -1,15 +1,16 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, os};
 
 use crate::{
     authenticate::{AuthResult, authenticate_password, check_action_auth},
     backend::{Backend, system::SystemBackend},
     cache::Cache,
     config::Config,
-    output::{self, prompt_password, wrong_password},
+    output::{self, Output, prompt_password, wrong_password},
     run::{env::Env, process::run_process},
     user::{get_user, get_user_by_id},
 };
 use clap::ArgMatches;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use nix::{
     sys::stat::{Mode, stat},
     unistd::{Uid, User, getuid},
@@ -373,8 +374,23 @@ impl<'a> Run<'a> {
     }
 
     fn preview(&self) {
-        println!("udo will perform the following actions:");
+        output::info(
+            "udo will perform the following actions",
+            self.config.display.nerd,
+            Some(Output::Stdout),
+        );
+
         self.actions.iter().for_each(|a| println!("{a}"));
+        enable_raw_mode().unwrap();
+        let yes = output::confirm::Confirmation::default()
+            .with_prompt("Continue?")
+            .run()
+            .unwrap_or_default();
+
+        disable_raw_mode().unwrap();
+        if !yes {
+            std::process::exit(0)
+        }
     }
 }
 
