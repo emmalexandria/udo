@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Display};
 
 use crate::{
-    authenticate::{AuthResult, authenticate_password},
+    authenticate::{AuthResult, authenticate_password, check_action_auth},
     backend::{Backend, system::SystemBackend},
     cache::Cache,
     config::Config,
@@ -282,9 +282,17 @@ impl<'a> Run<'a> {
             .collect::<Vec<_>>();
 
         let mut cache = Cache::new(&self.user);
-        let auth = self.login_user(self.config.security.tries, &mut cache);
-        match auth {
-            Ok(true) => self.after_auth(requires_login, requires_root, &mut cache)?,
+        let authenticated = self.login_user(self.config.security.tries, &mut cache);
+        let authorised = check_action_auth(self, self.config);
+        match authenticated {
+            Ok(true) => match authorised {
+                true => self.after_auth(requires_login, requires_root, &mut cache)?,
+                false => output::info(
+                    "udo configuration does not authorise you to perform this action",
+                    self.config.display.nerd,
+                    None,
+                ),
+            },
             Ok(false) => output::info("Login failed", self.config.display.nerd, None),
             Err(e) => output::error_with_details(
                 "Error while logging in",
