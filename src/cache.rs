@@ -74,10 +74,10 @@ impl Cache {
         let se = toml::Serializer::new(&mut buf);
         let out = entry.serialize(se)?;
 
-        run.backend.elevate();
+        run.backend.elevate()?;
         let mut file = File::create(f_path)?;
         file.write_all(out.to_string().as_bytes())?;
-        run.backend.restore();
+        run.backend.restore()?;
 
         Ok(())
     }
