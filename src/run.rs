@@ -116,14 +116,14 @@ impl Action {
                 ret
             }
             ActionType::Login => {
-                let shell = run.do_as.shell.to_string_lossy().to_string();
+                let cmd = run.command.clone();
                 let mut env = Env::login_env(run);
-                run_process(&[shell], &mut env)
+                run_process(&cmd.unwrap(), &mut env)
             }
             ActionType::Shell => {
-                let shell = run.user.shell.to_string_lossy().to_string();
+                let cmd = run.command.clone();
                 let mut env = Env::non_login_env(run);
-                run_process(&[shell], &mut env)
+                run_process(&cmd.clone().unwrap(), &mut env)
             }
             ActionType::RunCommand => {
                 let cmd = run.command.clone();
@@ -201,6 +201,10 @@ impl<'a> Run<'a> {
         if let Some(cmd) = matches.get_many::<String>("command") {
             command = Some(cmd.cloned().collect::<Vec<_>>());
             actions.push(Action::new(ActionType::RunCommand, ActionReqs::auth()));
+        } else if matches.get_flag("login") {
+            command = Some(vec![do_as.shell.to_string_lossy().to_string()])
+        } else if matches.get_flag("shell") {
+            command = Some(vec![user.shell.to_string_lossy().to_string()])
         }
 
         let backend = Box::new(SystemBackend::new(do_as.uid));
