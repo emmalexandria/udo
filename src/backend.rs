@@ -60,15 +60,13 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait InitBackend {
-    fn new() -> Self;
-}
-
 pub trait Backend {
     fn getuid(&self) -> Uid;
+    /// Sets the process uid, euid, and suid
     fn setuid(&mut self, uid: Uid) -> Result<()>;
 
     fn geteuid(&self) -> Uid;
+    /// Sets the process euid, inline with Unix permissions
     fn seteuid(&mut self, uid: Uid) -> Result<()>;
 
     fn getgid(&self) -> Gid;
@@ -76,8 +74,13 @@ pub trait Backend {
 
     fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()>;
 
+    /// Get an environment variable
     fn get_env(&self, name: &str) -> Result<String>;
+    /// Set an environment variable
     unsafe fn set_env(&mut self, name: &str, value: &str);
-
+    /// Get all environment variables as key value pairs
     fn vars(&self) -> Vec<(String, String)>;
+
+    /// Return if the process is currently "effectively" root, i.e. euid == 0 || uid == 0
+    fn is_root(&self) -> bool;
 }

@@ -82,4 +82,8 @@ impl Backend for SystemBackend {
     fn vars(&self) -> Vec<(String, String)> {
         env::vars().collect()
     }
+
+    fn is_root(&self) -> bool {
+        self.getuid().is_root() || self.geteuid().is_root()
+    }
 }

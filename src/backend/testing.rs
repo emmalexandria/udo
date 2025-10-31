@@ -2,7 +2,7 @@ use std::{collections::HashMap, env};
 
 use nix::unistd::{Gid, Uid};
 
-use crate::backend::{Backend, Error, ErrorKind, InitBackend};
+use crate::backend::{Backend, Error, ErrorKind};
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct TestProcess {
@@ -30,10 +30,8 @@ pub struct TestBackend {
     process: TestProcess,
 }
 
-impl InitBackend for TestBackend {
-    fn new() -> Self {
-        // Pretend we're a process run by a normal user with suid and owned by root
-        // Choose 512 because it's a nice round number
+impl Default for TestBackend {
+    fn default() -> Self {
         Self {
             // Nice round uid of 512
             uid: Uid::from_raw(512),
@@ -83,14 +81,15 @@ impl Backend for TestBackend {
     }
 
     fn seteuid(&mut self, uid: nix::unistd::Uid) -> super::Result<()> {
-        // Check if the saved set uid or the actual uid matches the UID attempting to be set
-        if self.suid == uid || self.uid == uid {
+        // Check if the saved set uid or the actual uid matches the UID attempting to be set or the
+        // process is root
+        if self.suid == uid || self.uid == uid || self.is_root() {
             self.suid = self.euid;
             self.euid = uid;
         } else {
             return Err(Error::new(
                 ErrorKind::EuidSet,
-                "EUID not present in UID or SUID",
+                "EUID not present in UID or SUID, process is not root",
             ));
         }
         Ok(())
@@ -101,7 +100,15 @@ impl Backend for TestBackend {
     }
 
     fn setgid(&mut self, gid: nix::unistd::Gid) -> super::Result<()> {
-        self.gid = gid;
+        if self.gid == gid || self.sgid == gid || self.is_root() {
+            self.gid = gid;
+        } else {
+            return Err(Error::new(
+                ErrorKind::GidSet,
+                "GID not present in GID or SGID, process is not root",
+            ));
+        }
+
         Ok(())
     }
 
@@ -141,5 +148,25 @@ impl Backend for TestBackend {
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
+    }
+
+    fn is_root(&self) -> bool {
+        self.uid.is_root() || self.euid.is_root()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nix::unistd::Uid;
+
+    use crate::backend::{Backend, testing::TestBackend};
+
+    #[test]
+    fn set_euid() {
+        let mut backend = TestBackend::default();
+        // We should be able to switch to seteuid to the uid
+        backend.seteuid(backend.getuid()).unwrap();
+        // And then switch back to root
+        backend.seteuid(Uid::from_raw(0)).unwrap();
     }
 }
