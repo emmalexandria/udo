@@ -62,7 +62,9 @@ impl Backend for TestBackend {
     fn setuid(&mut self, uid: nix::unistd::Uid) -> super::Result<()> {
         // In this function we assume the executable always has the suid permissions bit for
         // testing purposes
-        if uid != self.suid || !self.euid.is_root() {
+
+        // If uid is not the suid, not the uid, and we aren't root, we can't setuid
+        if uid != self.suid && uid != self.uid && !self.is_root() {
             return Err(Error::new(
                 ErrorKind::UidSet,
                 "UID does not match SUID, and EUID is not root",
@@ -164,9 +166,41 @@ mod tests {
     #[test]
     fn set_euid() {
         let mut backend = TestBackend::default();
-        // We should be able to switch to seteuid to the uid
+        // We should be able to seteuid to the uid
         backend.seteuid(backend.getuid()).unwrap();
-        // And then switch back to root
+        // And then switch back to root because its in suid
         backend.seteuid(Uid::from_raw(0)).unwrap();
+    }
+
+    #[test]
+    fn set_uid() {
+        let mut backend = TestBackend::default();
+
+        // As soon as we setuid to the uid, we should no longer have permissions to switch out our
+        // uid
+        backend.setuid(backend.getuid()).unwrap();
+        assert!(backend.seteuid(Uid::from_raw(0)).is_err())
+    }
+
+    // This test serves to both test the `is_root` function and also
+    // provides a more broad test of uid behaviour
+    #[test]
+    fn is_root() {
+        let mut backend = TestBackend::default();
+        // Store the initial value of uid for use later
+        let uid = backend.getuid();
+        assert!(backend.is_root());
+
+        backend.seteuid(backend.getuid()).unwrap();
+        assert!(!backend.is_root());
+
+        backend.seteuid(Uid::from_raw(0)).unwrap();
+        assert!(backend.is_root());
+
+        backend.setuid(backend.geteuid()).unwrap();
+        assert!(backend.is_root());
+
+        backend.setuid(uid).unwrap();
+        assert!(!backend.is_root());
     }
 }
