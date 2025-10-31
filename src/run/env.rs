@@ -1,9 +1,6 @@
 use std::env;
 
-use nix::{
-    sys::stat::{Mode, umask},
-    unistd::User,
-};
+use nix::sys::stat::{Mode, umask};
 
 use anyhow::Result;
 
@@ -47,7 +44,6 @@ pub struct Env<'a> {
     pub preserve_all: bool,
     pub safe_vars: Vec<String>,
     pub set_vars: Vars,
-    pub do_as: User,
     backend: &'a mut Box<dyn Backend>,
 }
 
@@ -65,19 +61,18 @@ impl<'a> Env<'a> {
     // These vars are always preserved
     const PRESERVE_VARS: [&'a str; 2] = ["TERM", "DISPLAY"];
 
-    pub fn login_env(run: &'a mut Run, path: Option<&String>) -> Self {
+    pub fn login_env(run: &'a mut Run) -> Self {
         let safe_vars = Self::const_vars_to_vec(&Self::PRESERVE_VARS);
         Self {
             login: true,
             safe_vars,
             preserve_all: run.flags.contains(&Flag::PreserveVars),
             set_vars: Vars::login(run),
-            do_as: run.do_as.clone(),
             backend: &mut run.backend,
         }
     }
 
-    pub fn non_login_env(run: &'a mut Run, path: Option<&String>) -> Self {
+    pub fn non_login_env(run: &'a mut Run) -> Self {
         let mut safe_vars = Self::const_vars_to_vec(&Self::SAFE_VARS);
         safe_vars.append(&mut Self::const_vars_to_vec(&Self::PRESERVE_VARS));
 
@@ -86,12 +81,11 @@ impl<'a> Env<'a> {
             safe_vars,
             preserve_all: run.flags.contains(&Flag::PreserveVars),
             set_vars: Vars::non_login(run),
-            do_as: run.do_as.clone(),
             backend: &mut run.backend,
         }
     }
 
-    pub fn process_env(run: &'a mut Run, path: Option<&String>) -> Self {
+    pub fn process_env(run: &'a mut Run) -> Self {
         let mut safe_vars = Self::const_vars_to_vec(&Self::SAFE_VARS);
         safe_vars.append(&mut Self::const_vars_to_vec(&Self::PRESERVE_VARS));
         Self {
@@ -99,7 +93,6 @@ impl<'a> Env<'a> {
             safe_vars,
             preserve_all: run.flags.contains(&Flag::PreserveVars),
             set_vars: Vars::non_login(run),
-            do_as: run.do_as.clone(),
             backend: &mut run.backend,
         }
     }

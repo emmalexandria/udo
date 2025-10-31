@@ -56,7 +56,7 @@ fn child(cmd_name: &str, args: Vec<&str>, env: &mut Env) -> Result<()> {
     let args: Vec<CString> = args.into_iter().map(|a| CString::new(a).unwrap()).collect();
 
     unsafe {
-        env.apply();
+        env.apply()?;
         umask(Mode::from_bits(0o022).unwrap());
     }
 

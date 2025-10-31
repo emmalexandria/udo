@@ -116,17 +116,17 @@ impl Action {
             }
             ActionType::Login => {
                 let shell = run.do_as.shell.to_string_lossy().to_string();
-                let mut env = Env::login_env(run, config.security.safe_path.as_ref());
+                let mut env = Env::login_env(run);
                 run_process(&[shell], &mut env)
             }
             ActionType::Shell => {
                 let shell = run.user.shell.to_string_lossy().to_string();
-                let mut env = Env::non_login_env(run, config.security.safe_path.as_ref());
+                let mut env = Env::non_login_env(run);
                 run_process(&[shell], &mut env)
             }
             ActionType::RunCommand => {
                 let cmd = run.command.clone();
-                let mut env = Env::process_env(run, run.config.security.safe_path.as_ref());
+                let mut env = Env::process_env(run);
                 run_process(&cmd.unwrap(), &mut env)?;
                 Ok(())
             }
