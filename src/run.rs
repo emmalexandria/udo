@@ -217,6 +217,11 @@ impl<'a> Run<'a> {
         })
     }
 
+    pub fn with_backend(mut self, backend: Box<dyn Backend>) -> Self {
+        self.backend = backend;
+        self
+    }
+
     fn get_actions(matches: &ArgMatches) -> Vec<Action> {
         let mut ret = Vec::new();
         if matches.get_flag("clear") {
