@@ -13,7 +13,7 @@ pub struct TestProcess {
 /// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
 /// but it aims to simulate *enough* to verify that udo has the expected behaviour
 #[derive(PartialEq, Eq, Clone)]
-pub struct TestingBackend {
+pub struct TestBackend {
     /// Stores the group id
     gid: Gid,
     /// Stores the real uid
@@ -26,7 +26,7 @@ pub struct TestingBackend {
     process: TestProcess,
 }
 
-impl InitBackend for TestingBackend {
+impl InitBackend for TestBackend {
     fn new() -> Self {
         // Pretend we're a process run by a normal user with suid and owned by root
         // Choose 512 because it's a nice round number
@@ -44,7 +44,7 @@ impl InitBackend for TestingBackend {
     }
 }
 
-impl Backend for TestingBackend {
+impl Backend for TestBackend {
     fn getuid(&self) -> nix::unistd::Uid {
         self.uid
     }
