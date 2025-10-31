@@ -46,7 +46,7 @@ account    required       pam_opendirectory.so
 
 ### Usage
 
-````
+```
 A modern replacement for sudo/doas
 
 Usage: udo [OPTIONS] [command]...
@@ -63,14 +63,54 @@ Options:
   -l, --login
   -h, --help          Print help
   -V, --version       Print version```
-````
+```
+
+#### Configuration
+udo's configuration file is located at `/etc/udo/config.toml`. Below is an example configuration showing all available options:
+```toml
+# Customises how udo looks
+[display]
+# Whether output should contain colors
+color = true
+# Whether output should use unicode symbols
+unicode = true
+# Whether output should use nerd icons
+nerd = true
+# Whether the password prompt should censor your password 
+censor = true
+# Whether the password/placeholder should be displayed at all
+display_pw = true
+
+# More granular customisation of output
+[display.theme]
+replace_char = '•'
+
+# Security settings
+[security]
+# How long a cached password run should last. Cached runs are stored by uid, tty, and parent pid
+timeout = 10
+# Number of password attempts before failure
+tries = 3
+# The PATH variable to set. If unset, the entire PATH will be preserved
+safe_path = "/usr/bin:/usr/local/bin:[etc]" 
+
+# [[rules]] is an array of rules
+[[rules]]
+# target sets the user it targets. Like sudo, groups are prefixed with %
+target = "%admin"
+# hostname the rule applies to 
+host = "ALL"
+# do as user the rule applies to
+user = "root"
+# commands the rule applies to
+command = "ALL"
+
+# So this rule allows users of group %admin to run any command on any hostname as root
+# Equivalent to the sudo rule %admin ALL=(root) ALL
+```
 
 ### A Word of Warning
 
 I am not really a Unix developer, nor am I used to writing secure tools. This tool was created for my own use and as a learning exercise. I do have an interest in making it better for general usage, but I don't know where to start. If you use udo, please be aware that it probably **_will_** break, have vulnerabilities, fail to execute commands correctly, and more. This will be the case until it reaches `v1.0.0`
 
 I would like udo to be robust enough that it can be the sole `suid` tool installed on some systems _some day_ but it is nowhere near that point. In addition, by installing it you are probably increasing your attack surface dramatically. I'm proud of this piece of software, but it is still very much a work in progress.
-
-```
-
-```
