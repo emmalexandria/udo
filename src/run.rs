@@ -282,7 +282,9 @@ impl<'a> Run<'a> {
             .collect::<Vec<_>>();
 
         let mut cache = Cache::new(&self.user);
+        // Authenticated represents if the user sucessfully logged in
         let authenticated = self.login_user(self.config.security.tries, &mut cache);
+        // Authorised represents if the user is actually allowed to do what they're trying to do
         let authorised = check_action_auth(self, self.config);
         match authenticated {
             Ok(true) => match authorised {
