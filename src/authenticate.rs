@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// ActionValue represents a value within [Action]. It can either be Any, or a specific Value.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum ActionValue {
     #[default]
     Any,
@@ -66,7 +66,7 @@ impl Action {
             ActionValue::Any => true,
             ActionValue::Value(v) => {
                 let v = v.clone();
-                matches!(&other.command, ActionValue::Value(v))
+                other.command == ActionValue::Value(v)
             }
         };
 
