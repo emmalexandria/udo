@@ -154,21 +154,6 @@ impl Backend for TestBackend {
         self.env.remove(name);
     }
 
-    fn read_file(&self, path: &str) -> Result<String> {
-        self.files
-            .get(path)
-            .ok_or(Error::new(
-                ErrorKind::DoesNotExist,
-                "Requested file does not exist",
-            ))
-            .cloned()
-    }
-
-    fn write_file(&mut self, path: &str, content: String) -> Result<()> {
-        self.files.insert(path.to_string(), content);
-        Ok(())
-    }
-
     fn is_root(&self) -> bool {
         self.uid.is_root() || self.euid.is_root()
     }

@@ -96,24 +96,6 @@ impl Backend for SystemBackend {
         env::vars().collect()
     }
 
-    fn read_file(&self, path: &str) -> Result<String> {
-        fs::read_to_string(path).map_err(|_| {
-            Error::new(
-                ErrorKind::DoesNotExist,
-                "File does not exist or you cannot access it",
-            )
-        })
-    }
-
-    fn write_file(&mut self, path: &str, content: String) -> Result<()> {
-        fs::write(path, content.as_bytes()).map_err(|_| {
-            Error::new(
-                ErrorKind::DoesNotExist,
-                "File does not exist or you cannot access it",
-            )
-        })
-    }
-
     fn is_root(&self) -> bool {
         self.getuid().is_root() || self.geteuid().is_root()
     }
