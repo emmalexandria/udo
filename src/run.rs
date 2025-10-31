@@ -380,7 +380,9 @@ impl<'a> Run<'a> {
             Some(Output::Stdout),
         );
 
-        self.actions.iter().for_each(|a| println!("{a}"));
+        self.actions
+            .iter()
+            .for_each(|a| println!("{}", self.display_action(a)));
         enable_raw_mode().unwrap();
         let yes = output::confirm::Confirmation::default()
             .with_prompt("Continue?")
@@ -390,6 +392,32 @@ impl<'a> Run<'a> {
         disable_raw_mode().unwrap();
         if !yes {
             std::process::exit(0)
+        }
+    }
+
+    fn display_action(&self, action: &Action) -> String {
+        let name = format!("{action}");
+        let info: Option<String> = match action.a_type {
+            ActionType::ClearCache => Some(format!("of user {}", self.user.name)),
+            ActionType::Login => Some(format!(
+                "to user {} on shell {}",
+                self.do_as.name,
+                self.do_as.shell.to_string_lossy()
+            )),
+            ActionType::Shell => Some(format!("to user {}", self.do_as.name)),
+            ActionType::RunCommand => {
+                if let Some(cmd) = &self.command {
+                    Some(cmd.join(" "))
+                } else {
+                    None
+                }
+            }
+        };
+
+        if let Some(info) = info {
+            format!("{name} ({info})")
+        } else {
+            name
         }
     }
 }
