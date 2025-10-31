@@ -81,6 +81,12 @@ pub trait Backend {
     /// Get all environment variables as key value pairs
     fn vars(&self) -> Vec<(String, String)>;
 
+    fn elevate(&mut self) -> Result<()>;
+
+    fn restore(&mut self) -> Result<()>;
+
+    fn switch_final(&mut self) -> Result<()>;
+
     /// Return if the process is currently "effectively" root, i.e. euid == 0 || uid == 0
     fn is_root(&self) -> bool;
 }

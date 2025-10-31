@@ -2,7 +2,7 @@ use std::{collections::HashMap, env};
 
 use nix::unistd::{Gid, Uid};
 
-use crate::backend::{Backend, Error, ErrorKind};
+use crate::backend::{Backend, Error, ErrorKind, Result};
 
 /// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
 /// but it aims to simulate *enough* to verify that udo has the expected behaviour
@@ -20,6 +20,9 @@ pub struct TestBackend {
     euid: Uid,
     /// Stores the saved-set uid, necessary for switching the euid
     suid: Uid,
+    /// Stores the original user UID, for use in elevate and restore functions
+    original: Uid,
+    target: Uid,
     env: HashMap<String, String>,
 }
 
@@ -38,6 +41,8 @@ impl Default for TestBackend {
             euid: Uid::from_raw(0),
             // And therefore so is suid
             suid: Uid::from_raw(0),
+            original: Uid::from_raw(512),
+            target: Uid::from_raw(0),
             env: HashMap::new(),
         }
     }
@@ -48,7 +53,7 @@ impl Backend for TestBackend {
         self.uid
     }
 
-    fn setuid(&mut self, uid: nix::unistd::Uid) -> super::Result<()> {
+    fn setuid(&mut self, uid: nix::unistd::Uid) -> Result<()> {
         // In this function we assume the executable always has the suid permissions bit for
         // testing purposes
 
@@ -71,7 +76,7 @@ impl Backend for TestBackend {
         self.euid
     }
 
-    fn seteuid(&mut self, uid: nix::unistd::Uid) -> super::Result<()> {
+    fn seteuid(&mut self, uid: nix::unistd::Uid) -> Result<()> {
         // Check if the saved set uid or the actual uid matches the UID attempting to be set or the
         // process is root
         if self.suid == uid || self.uid == uid || self.is_root() {
@@ -90,7 +95,7 @@ impl Backend for TestBackend {
         self.gid
     }
 
-    fn setgid(&mut self, gid: nix::unistd::Gid) -> super::Result<()> {
+    fn setgid(&mut self, gid: nix::unistd::Gid) -> Result<()> {
         if self.gid == gid || self.sgid == gid || self.is_root() {
             self.gid = gid;
         } else {
@@ -105,7 +110,7 @@ impl Backend for TestBackend {
 
     // In our test backend, execvp doesn't actually have to do anything. Always returns Ok(())
     // without executing any code
-    fn execvp(&mut self, process: &str, args: &[&str]) -> super::Result<()> {
+    fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()> {
         Ok(())
     }
 
@@ -137,6 +142,18 @@ impl Backend for TestBackend {
 
     fn is_root(&self) -> bool {
         self.uid.is_root() || self.euid.is_root()
+    }
+
+    fn elevate(&mut self) -> Result<()> {
+        self.seteuid(Uid::from_raw(0))
+    }
+
+    fn restore(&mut self) -> Result<()> {
+        self.seteuid(self.original)
+    }
+
+    fn switch_final(&mut self) -> Result<()> {
+        self.setuid(self.target)
     }
 }
 

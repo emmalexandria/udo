@@ -4,14 +4,26 @@ use std::{
     io,
 };
 
-use nix::unistd::{Gid, Uid, execvp, seteuid, setgid, setuid};
+use nix::unistd::{Gid, Uid, execvp, geteuid, getuid, seteuid, setgid, setuid};
 
 use crate::backend::{Backend, Error, ErrorKind, Result};
 
 /// This is a [Backend] used for running udo. It interacts directly with the system
 /// it is running on, and all actions performed on it reflect directly on the system
 #[derive(Eq, PartialEq, Clone)]
-pub struct SystemBackend {}
+pub struct SystemBackend {
+    original: Uid,
+    target: Uid,
+}
+
+impl SystemBackend {
+    pub fn new(target: Uid) -> Self {
+        Self {
+            original: getuid(),
+            target,
+        }
+    }
+}
 
 impl Backend for SystemBackend {
     fn getuid(&self) -> Uid {
@@ -85,5 +97,17 @@ impl Backend for SystemBackend {
 
     fn is_root(&self) -> bool {
         self.getuid().is_root() || self.geteuid().is_root()
+    }
+
+    fn elevate(&mut self) -> Result<()> {
+        self.seteuid(Uid::from_raw(0))
+    }
+
+    fn restore(&mut self) -> Result<()> {
+        self.seteuid(self.original)
+    }
+
+    fn switch_final(&mut self) -> Result<()> {
+        self.setuid(self.target)
     }
 }

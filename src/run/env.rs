@@ -97,7 +97,7 @@ impl Env {
         }
     }
 
-    pub unsafe fn elevate_final(&self) -> Result<()> {
+    pub fn elevate_final(&self) -> Result<()> {
         seteuid(Uid::from_raw(0))?;
         setuid(self.do_as.uid)?;
         setgid(self.do_as.gid)?;
