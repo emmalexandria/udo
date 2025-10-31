@@ -4,12 +4,6 @@ use nix::unistd::{Gid, Uid};
 
 use crate::backend::{Backend, Error, ErrorKind};
 
-#[derive(PartialEq, Eq, Clone)]
-pub struct TestProcess {
-    pub name: String,
-    pub args: Vec<String>,
-}
-
 /// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
 /// but it aims to simulate *enough* to verify that udo has the expected behaviour
 #[derive(PartialEq, Eq, Clone)]
@@ -27,7 +21,6 @@ pub struct TestBackend {
     /// Stores the saved-set uid, necessary for switching the euid
     suid: Uid,
     env: HashMap<String, String>,
-    process: TestProcess,
 }
 
 impl Default for TestBackend {
@@ -46,10 +39,6 @@ impl Default for TestBackend {
             // And therefore so is suid
             suid: Uid::from_raw(0),
             env: HashMap::new(),
-            process: TestProcess {
-                name: "udo".to_string(),
-                args: vec![],
-            },
         }
     }
 }
@@ -114,16 +103,9 @@ impl Backend for TestBackend {
         Ok(())
     }
 
+    // In our test backend, execvp doesn't actually have to do anything. Always returns Ok(())
+    // without executing any code
     fn execvp(&mut self, process: &str, args: &[&str]) -> super::Result<()> {
-        self.process = TestProcess {
-            name: process.to_string(),
-            args: args
-                .iter()
-                .map(|s| s.as_ref())
-                .map(str::to_string)
-                .collect(),
-        };
-
         Ok(())
     }
 
@@ -137,7 +119,8 @@ impl Backend for TestBackend {
         Ok(res.clone())
     }
 
-    // In our simulated env, this call can never fail
+    // In our simulated Unix environment, this call can never fail. It's still unsafe because that's
+    // what we define in the trait, but it doesn't have to be.
     unsafe fn set_env(&mut self, name: &str, value: &str) {
         if self.env.contains_key(name) {
             self.env.remove(name);
