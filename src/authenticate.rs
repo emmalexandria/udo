@@ -23,7 +23,7 @@ pub enum ActionValue {
 impl From<String> for ActionValue {
     fn from(value: String) -> Self {
         match value.as_str() {
-            "any" => Self::Any,
+            "ALL" => Self::Any,
             _ => Self::Value(value),
         }
     }
