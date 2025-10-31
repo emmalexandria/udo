@@ -81,10 +81,13 @@ pub trait Backend {
     /// Get all environment variables as key value pairs
     fn vars(&self) -> Vec<(String, String)>;
 
+    /// Elevate to root for privileged operations
     fn elevate(&mut self) -> Result<()>;
 
+    /// Restore to the original user
     fn restore(&mut self) -> Result<()>;
 
+    /// Make the final switch (setuid) to the target user
     fn switch_final(&mut self) -> Result<()>;
 
     /// Return if the process is currently "effectively" root, i.e. euid == 0 || uid == 0
