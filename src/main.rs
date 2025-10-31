@@ -14,7 +14,6 @@ mod backend;
 mod cache;
 mod cli;
 mod config;
-mod elevate;
 mod error;
 mod output;
 mod run;
@@ -39,7 +38,7 @@ fn main() {
         force_color_output(false);
     }
 
-    let run = Run::create(&matches, &config, Some(Box::new(SystemBackend {})));
+    let run = Run::create(&matches, &config);
     match run {
         Ok(mut r) => {
             r.do_run();

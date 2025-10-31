@@ -97,10 +97,15 @@ impl Action {
         Self { a_type, reqs }
     }
 
-    pub fn do_action(&self, run: &mut Run, config: &Config) -> anyhow::Result<()> {
+    pub fn do_action(
+        &self,
+        run: &mut Run,
+        config: &Config,
+        cache: &mut Cache,
+    ) -> anyhow::Result<()> {
         match self.a_type {
             ActionType::ClearCache => {
-                let ret = run.cache.clear();
+                let ret = cache.clear(&mut run.backend);
                 output::info(
                     format!("Cleared cache for user \"{}\"", run.user.name),
                     config.display.nerd,
@@ -164,22 +169,17 @@ impl Error {
 }
 
 pub struct Run<'a> {
-    backend: Box<dyn Backend>,
+    pub backend: Box<dyn Backend>,
     pub actions: Vec<Action>,
     pub flags: HashSet<Flag>,
     pub command: Option<Vec<String>>,
-    pub cache: Cache,
     pub user: User,
     pub do_as: User,
     pub config: &'a Config,
 }
 
 impl<'a> Run<'a> {
-    pub fn create(
-        matches: &ArgMatches,
-        config: &'a Config,
-        backend: Option<Box<dyn Backend>>,
-    ) -> Result<Self, Error> {
+    pub fn create(matches: &ArgMatches, config: &'a Config) -> Result<Self, Error> {
         let do_as_arg = matches
             .get_one::<String>("user")
             .expect("No user specified. This should not happen! Please file a bug report");
@@ -190,9 +190,6 @@ impl<'a> Run<'a> {
 
         let user = get_user_by_id(getuid())
             .expect("Cannot get current user. This should not happen! Please file a bug report");
-        let root = get_root_user();
-
-        let cache = Cache::new(&user, &root);
 
         let mut actions = Self::get_actions(matches);
         let flags = Self::get_flags(matches);
@@ -203,12 +200,11 @@ impl<'a> Run<'a> {
             actions.push(Action::new(ActionType::RunCommand, ActionReqs::auth()));
         }
 
-        let backend = backend.unwrap_or(Box::new(SystemBackend {}));
+        let backend = Box::new(SystemBackend::new(user.uid));
 
         Ok(Self {
             backend,
             command,
-            cache,
             do_as,
             user,
             actions,
@@ -276,9 +272,10 @@ impl<'a> Run<'a> {
             .filter(|a| !requires_root.contains(a) && !requires_login.contains(a))
             .collect::<Vec<_>>();
 
-        let auth = self.login_user(self.config.security.tries);
+        let mut cache = Cache::new(&self.user);
+        let auth = self.login_user(self.config.security.tries, &mut cache);
         match auth {
-            Ok(true) => self.after_auth(requires_login, requires_root)?,
+            Ok(true) => self.after_auth(requires_login, requires_root, &mut cache)?,
             Ok(false) => output::info("Login failed", self.config.display.nerd, None),
             Err(e) => output::error_with_details(
                 "Error while logging in",
@@ -291,8 +288,8 @@ impl<'a> Run<'a> {
         Ok(())
     }
 
-    fn login_user(&mut self, tries: usize) -> anyhow::Result<bool> {
-        match self.cache.check_cache(self, self.config) {
+    fn login_user(&mut self, tries: usize, cache: &mut Cache) -> anyhow::Result<bool> {
+        match cache.check_cache(self, self.config) {
             Ok(true) => return Ok(true),
             Ok(false) => {}
             Err(e) => output::error(
@@ -316,7 +313,7 @@ impl<'a> Run<'a> {
             AuthResult::NotAuthenticated => {
                 if tries > 1 {
                     wrong_password(self.config.display.nerd, tries - 1);
-                    self.login_user(tries - 1)
+                    self.login_user(tries - 1, cache)
                 } else {
                     Ok(false)
                 }
@@ -333,11 +330,16 @@ impl<'a> Run<'a> {
         }
     }
 
-    fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
-        self.cache.create_dir()?;
-        self.cache.cache_run(self)?;
+    fn after_auth(
+        &mut self,
+        login: Vec<Action>,
+        root: Vec<Action>,
+        cache: &mut Cache,
+    ) -> anyhow::Result<()> {
+        cache.create_dir(&mut self.backend)?;
+        cache.cache_run(self)?;
         for action in login {
-            let res = action.do_action(self, self.config);
+            let res = action.do_action(self, self.config, cache);
 
             if res.is_err() {
                 output::error_with_details(

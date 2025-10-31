@@ -28,21 +28,27 @@ pub struct TestBackend {
 
 impl Default for TestBackend {
     fn default() -> Self {
+        let user = Uid::from_raw(512);
+        let group = Gid::from_raw(512);
+        let root = Uid::from_raw(0);
+
         Self {
             // Nice round uid of 512
-            uid: Uid::from_raw(512),
-            // Same for the gid
-            gid: Gid::from_raw(512),
-            // We dont run with sgid perms, so its the same
-            egid: Gid::from_raw(512),
-            // Therefore, so is sgid
-            sgid: Gid::from_raw(512),
+            uid: user,
             // We do run with suid perms, so thats root
-            euid: Uid::from_raw(0),
+            euid: root,
             // And therefore so is suid
-            suid: Uid::from_raw(0),
-            original: Uid::from_raw(512),
-            target: Uid::from_raw(0),
+            suid: root,
+            // Same for the gid
+            gid: group,
+            // We dont run with sgid perms, so its the same
+            egid: group,
+            // Therefore, so is sgid
+            sgid: group,
+            // The original user is always the user running the program
+            original: user,
+            // We default the target user to root for testing purposes
+            target: root,
             env: HashMap::new(),
         }
     }
