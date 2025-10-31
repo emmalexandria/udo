@@ -201,7 +201,7 @@ impl<'a> Run<'a> {
             actions.push(Action::new(ActionType::RunCommand, ActionReqs::auth()));
         }
 
-        let backend = Box::new(SystemBackend::new(user.uid));
+        let backend = Box::new(SystemBackend::new(do_as.uid));
 
         Ok(Self {
             backend,
