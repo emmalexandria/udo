@@ -11,7 +11,8 @@ use crate::{
 };
 use clap::ArgMatches;
 use crossterm::{
-    style::Stylize,
+    execute,
+    style::{Print, Stylize},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use nix::{
@@ -384,12 +385,15 @@ impl<'a> Run<'a> {
         output::info(
             "udo will perform the following actions",
             self.config.display.nerd,
-            Some(Output::Stdout),
+            Some(Output::Tty),
         );
 
-        self.actions
-            .iter()
-            .for_each(|a| println!("{}", self.display_action(a)));
+        let mut tty = Output::Tty.get_write();
+
+        self.actions.iter().for_each(|a| {
+            let output = format!("{}\n", self.display_action(a));
+            execute!(tty, Print(output));
+        });
         enable_raw_mode().unwrap();
         let yes = output::confirm::Confirmation::default()
             .with_prompt("Continue?")
@@ -403,7 +407,6 @@ impl<'a> Run<'a> {
     }
 
     fn display_action(&self, action: &Action) -> MultiStyled<String> {
-        let mut output: MultiStyled<String> = MultiStyled::default();
         let name = format!("{action}");
         let info: Option<String> = match action.a_type {
             ActionType::ClearCache => Some(format!("of user {}", self.user.name)),

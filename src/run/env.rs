@@ -112,7 +112,7 @@ impl<'a> Env<'a> {
     }
 
     unsafe fn apply_vars(&mut self) {
-        let vars = env::vars();
+        let vars = self.backend.vars();
 
         unsafe {
             if !self.preserve_all {
