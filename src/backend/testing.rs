@@ -6,7 +6,10 @@ use nix::{
     unistd::{Gid, Uid},
 };
 
-use crate::backend::{Error, ErrorKind, ProcessManager, Result, Syscalls, vfs::VirtualFS};
+use crate::backend::{
+    Error, ErrorKind, ProcessManager, Result, Syscalls,
+    vfs::{VFile, VirtualFS},
+};
 
 /// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
 /// but it aims to simulate *enough* to verify that udo has the expected behaviour
@@ -39,6 +42,8 @@ impl Default for TestBackend {
         let group = Gid::from_raw(512);
         let root = Uid::from_raw(0);
 
+        let vfs = VirtualFS::new().with_config().unwrap();
+
         Self {
             // Nice round uid of 512
             uid: RefCell::new(user),
@@ -57,7 +62,7 @@ impl Default for TestBackend {
             // We default the target user to root for testing purposes
             target: root,
             env: HashMap::new(),
-            vfs: VirtualFS::new(),
+            vfs,
         }
     }
 }

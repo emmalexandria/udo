@@ -10,8 +10,12 @@ use nix::{
     sys::stat::Mode,
     unistd::{Gid, Uid},
 };
+use serde::Serialize;
 
-use crate::backend::{Error, ErrorKind};
+use crate::{
+    backend::{Error, ErrorKind},
+    config::{CONFIG_PATH, Config},
+};
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct VFile {
@@ -19,6 +23,17 @@ pub struct VFile {
     uid: Uid,
     gid: Gid,
     mode: Mode,
+}
+
+impl VFile {
+    pub fn new(content: Vec<u8>, uid: Uid, gid: Gid, mode: Mode) -> Self {
+        Self {
+            content,
+            uid,
+            gid,
+            mode,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -46,6 +61,24 @@ impl VirtualFS {
 
     pub fn insert_file<P: Into<PathBuf>>(&self, path: P, file: VFile) {
         self.files.borrow_mut().insert(path.into(), file);
+    }
+
+    pub fn with_config(self) -> anyhow::Result<Self> {
+        let config = Config::default();
+        let mut buf = toml::ser::Buffer::new();
+        let se = toml::Serializer::new(&mut buf);
+        let out = config.serialize(se)?;
+
+        let file = VFile::new(
+            out.to_string().as_bytes().to_vec(),
+            Uid::from_raw(0),
+            Gid::from_raw(0),
+            Mode::from_bits_truncate(0o0440),
+        );
+
+        self.insert_file(CONFIG_PATH, file);
+
+        Ok(self)
     }
 
     pub fn open<P: Into<PathBuf>>(&self, path: P, flags: OFlag) -> Result<i32, Error> {

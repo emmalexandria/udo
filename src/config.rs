@@ -9,7 +9,7 @@ use crate::{
     output::{self, theme::Theme},
 };
 
-const CONFIG_PATH: &str = "/etc/udo/config.toml";
+pub const CONFIG_PATH: &str = "/etc/udo/config.toml";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
