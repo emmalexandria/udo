@@ -5,12 +5,15 @@ use crate::{
     backend::{Backend, system::SystemBackend},
     cache::Cache,
     config::Config,
-    output::{self, Output, prompt_password, wrong_password},
+    output::{self, MultiStyled, Output, prompt_password, wrong_password},
     run::{env::Env, process::run_process},
     user::{get_user, get_user_by_id},
 };
 use clap::ArgMatches;
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::{
+    style::Stylize,
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 use nix::{
     sys::stat::{Mode, stat},
     unistd::{Uid, User, getuid},
@@ -399,7 +402,8 @@ impl<'a> Run<'a> {
         }
     }
 
-    fn display_action(&self, action: &Action) -> String {
+    fn display_action(&self, action: &Action) -> MultiStyled<String> {
+        let mut output: MultiStyled<String> = MultiStyled::default();
         let name = format!("{action}");
         let info: Option<String> = match action.a_type {
             ActionType::ClearCache => Some(format!("of user {}", self.user.name)),
@@ -419,9 +423,11 @@ impl<'a> Run<'a> {
         };
 
         if let Some(info) = info {
-            format!("{name} ({info})")
+            MultiStyled::default()
+                .with(format!("{name}: ").stylize().bold())
+                .with(info.stylize().italic())
         } else {
-            name
+            MultiStyled::default().with(name.stylize().bold())
         }
     }
 }
