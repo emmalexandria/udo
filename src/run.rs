@@ -3,7 +3,7 @@ use std::{collections::HashSet, fmt::Display, os};
 use crate::{
     authenticate::{AuthResult, authenticate_password, check_action_auth},
     backend::{Backend, system::SystemBackend},
-    cache::Cache,
+    cache::{self, Cache, CacheEntry, check_cache},
     config::Config,
     output::{self, MultiStyled, Output, prompt_password, wrong_password},
     run::{env::Env, process::run_process},
@@ -102,15 +102,10 @@ impl Action {
         Self { a_type, reqs }
     }
 
-    pub fn do_action(
-        &self,
-        run: &mut Run,
-        config: &Config,
-        cache: &mut Cache,
-    ) -> anyhow::Result<()> {
+    pub fn do_action(&self, run: &mut Run, config: &Config) -> anyhow::Result<()> {
         match self.a_type {
             ActionType::ClearCache => {
-                let ret = cache.clear(&mut run.backend);
+                let ret = cache::clear_cache(&run.user, &mut run.backend);
                 output::info(
                     format!("Cleared cache for user \"{}\"", run.user.name),
                     config.display.nerd,
@@ -290,14 +285,13 @@ impl<'a> Run<'a> {
             .filter(|a| !requires_root.contains(a) && !requires_login.contains(a))
             .collect::<Vec<_>>();
 
-        let mut cache = Cache::new(&self.user);
         // Authenticated represents if the user sucessfully logged in
-        let authenticated = self.login_user(self.config.security.tries, &mut cache);
+        let authenticated = self.login_user(self.config.security.tries);
         // Authorised represents if the user is actually allowed to do what they're trying to do
         let authorised = check_action_auth(self, self.config);
         match authenticated {
             Ok(true) => match authorised {
-                true => self.after_auth(requires_login, requires_root, &mut cache)?,
+                true => self.after_auth(requires_login, requires_root)?,
                 false => output::info(
                     "udo configuration does not authorise you to perform this action",
                     self.config.display.nerd,
@@ -316,8 +310,8 @@ impl<'a> Run<'a> {
         Ok(())
     }
 
-    fn login_user(&mut self, tries: usize, cache: &mut Cache) -> anyhow::Result<bool> {
-        match cache.check_cache(self, self.config) {
+    fn login_user(&mut self, tries: usize) -> anyhow::Result<bool> {
+        match check_cache(self, self.config) {
             Ok(true) => return Ok(true),
             Ok(false) => {}
             Err(e) => output::error(
@@ -341,7 +335,7 @@ impl<'a> Run<'a> {
             AuthResult::NotAuthenticated => {
                 if tries > 1 {
                     wrong_password(self.config.display.nerd, tries - 1);
-                    self.login_user(tries - 1, cache)
+                    self.login_user(tries - 1)
                 } else {
                     Ok(false)
                 }
@@ -358,16 +352,12 @@ impl<'a> Run<'a> {
         }
     }
 
-    fn after_auth(
-        &mut self,
-        login: Vec<Action>,
-        root: Vec<Action>,
-        cache: &mut Cache,
-    ) -> anyhow::Result<()> {
-        cache.create_dir(&mut self.backend)?;
-        cache.cache_run(self)?;
+    fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
+        cache::create_cache_dir(&self.user, &mut self.backend)?;
+        let entry: CacheEntry = self.try_into()?;
+        cache::write_entry(&self.user, entry, &mut self.backend)?;
         for action in login {
-            let res = action.do_action(self, self.config, cache);
+            let res = action.do_action(self, self.config);
 
             if res.is_err() {
                 output::error_with_details(
