@@ -1,10 +1,11 @@
+use std::os::fd::{AsRawFd, FromRawFd};
 use std::{env, ffi::CString, fs, os::fd::OwnedFd};
 
 use nix::fcntl::{OFlag, open};
 use nix::sys::stat::Mode;
 use nix::unistd::{Gid, Uid, execvp, getuid, seteuid, setgid, setuid};
 
-use crate::backend::{Error, ErrorKind, ProcessManager, Result, Syscalls};
+use crate::backend::{Backend, Error, ErrorKind, ProcessManager, Result, Syscalls};
 
 /// This is a [Backend] used for running udo. It interacts directly with the system
 /// it is running on, and all actions performed on it reflect directly on the system
@@ -22,6 +23,8 @@ impl SystemBackend {
         }
     }
 }
+
+impl Backend for SystemBackend {}
 
 impl ProcessManager for SystemBackend {
     fn getuid(&self) -> Uid {
@@ -117,9 +120,17 @@ impl ProcessManager for SystemBackend {
 }
 
 impl Syscalls for SystemBackend {
-    type Fd = OwnedFd;
+    fn open(&self, path: &std::path::Path, flags: OFlag, mode: Mode) -> Result<i32> {
+        open(path, flags, mode)
+            .map_err(|e| Error::new(ErrorKind::System(e), "Could not open file"))
+            .map(|fd| fd.as_raw_fd())
+    }
 
-    fn open(&self, path: &std::path::Path, flags: OFlag, mode: Mode) -> Result<Self::Fd> {
-        open(path, flags, mode).map_err(|e| Error::new(ErrorKind::System(e), "Could not open file"))
+    fn read(&self, fd: i32, buf: &mut [u8]) -> Result<usize> {
+        unsafe {
+            let fd = OwnedFd::from_raw_fd(fd);
+            nix::unistd::read(&fd, buf)
+                .map_err(|e| Error::new(ErrorKind::System(e), "Could not read file"))
+        }
     }
 }

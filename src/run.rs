@@ -2,7 +2,7 @@ use std::{collections::HashSet, fmt::Display, os};
 
 use crate::{
     authenticate::{AuthResult, authenticate_password, check_action_auth},
-    backend::{ProcessManager, system::SystemBackend},
+    backend::{Backend, ProcessManager, system::SystemBackend},
     cache::{self, Cache, CacheEntry, check_cache},
     config::Config,
     output::{self, MultiStyled, Output, prompt_password, wrong_password},
@@ -171,7 +171,7 @@ impl Error {
 }
 
 pub struct Run<'a> {
-    pub backend: Box<dyn ProcessManager>,
+    pub backend: Box<dyn Backend>,
     pub actions: Vec<Action>,
     pub flags: HashSet<Flag>,
     pub command: Option<Vec<String>>,
@@ -219,7 +219,7 @@ impl<'a> Run<'a> {
         })
     }
 
-    pub fn with_backend(mut self, backend: Box<dyn ProcessManager>) -> Self {
+    pub fn with_backend(mut self, backend: Box<dyn Backend>) -> Self {
         self.backend = backend;
         self
     }

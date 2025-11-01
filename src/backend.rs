@@ -73,9 +73,9 @@ impl Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub trait Syscalls {
-    type Fd;
+    fn open(&self, path: &Path, flags: OFlag, mode: Mode) -> Result<i32>;
 
-    fn open(&self, path: &Path, flags: OFlag, mode: Mode) -> Result<Self::Fd>;
+    fn read(&self, fd: i32, buf: &mut [u8]) -> Result<usize>;
 }
 
 pub trait ProcessManager {

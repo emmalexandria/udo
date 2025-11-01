@@ -182,10 +182,12 @@ impl ProcessManager for TestBackend {
 }
 
 impl Syscalls for TestBackend {
-    type Fd = i32;
-
-    fn open(&self, path: &std::path::Path, flags: OFlag, mode: Mode) -> Result<Self::Fd> {
+    fn open(&self, path: &std::path::Path, flags: OFlag, mode: Mode) -> Result<i32> {
         self.vfs.open(path, flags)
+    }
+
+    fn read(&self, fd: i32, buf: &mut [u8]) -> Result<usize> {
+        self.vfs.read(fd, buf)
     }
 }
 

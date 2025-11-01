@@ -1,11 +1,13 @@
 use anyhow::Result;
-use std::{fs, io};
+use nix::{fcntl::OFlag, sys::stat::Mode};
+use std::{fs, io, path::PathBuf};
 use toml::Deserializer;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     authenticate::Rule,
+    backend::Backend,
     output::{self, theme::Theme},
 };
 
@@ -62,9 +64,11 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn read() -> Result<Self> {
+    pub fn read(backend: &dyn Backend) -> Result<Self> {
         let mut de: Option<Deserializer> = None;
         let mut content: Option<String> = None;
+        let path = PathBuf::from(CONFIG_PATH);
+        let fd = backend.open(&path, OFlag::O_RDONLY, Mode::from_bits_truncate(0))?;
         match fs::read_to_string(CONFIG_PATH) {
             Ok(f) => content = Some(f),
             Err(e) => output::error(format!("Failed to read config file ({e})"), false, None),

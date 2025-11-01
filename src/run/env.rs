@@ -5,7 +5,7 @@ use nix::sys::stat::{Mode, umask};
 use anyhow::Result;
 
 use crate::{
-    backend::ProcessManager,
+    backend::{Backend, ProcessManager},
     run::{Flag, Run},
 };
 
@@ -44,7 +44,7 @@ pub struct Env<'a> {
     pub preserve_all: bool,
     pub safe_vars: Vec<String>,
     pub set_vars: Vars,
-    pub backend: &'a mut Box<dyn ProcessManager>,
+    pub backend: &'a mut Box<dyn Backend>,
 }
 
 impl<'a> Env<'a> {
