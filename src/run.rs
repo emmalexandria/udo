@@ -181,7 +181,11 @@ pub struct Run<'a> {
 }
 
 impl<'a> Run<'a> {
-    pub fn create(matches: &ArgMatches, config: &'a Config) -> Result<Self, Error> {
+    pub fn create(
+        matches: &ArgMatches,
+        config: &'a Config,
+        backend: Box<dyn Backend>,
+    ) -> Result<Self, Error> {
         let do_as_arg = matches
             .get_one::<String>("user")
             .expect("No user specified. This should not happen! Please file a bug report");
@@ -205,8 +209,6 @@ impl<'a> Run<'a> {
         } else if matches.get_flag("shell") {
             command = Some(vec![user.shell.to_string_lossy().to_string()])
         }
-
-        let backend = Box::new(SystemBackend::new(do_as.uid));
 
         Ok(Self {
             backend,

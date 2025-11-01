@@ -1,8 +1,11 @@
 use std::process::exit;
 
 use crossterm::style::force_color_output;
+use nix::unistd::Uid;
 
-use crate::{cli::get_cli, config::Config, run::Run};
+use crate::{
+    backend::system::SystemBackend, cli::get_cli, config::Config, run::Run, user::get_root_user,
+};
 
 mod authenticate;
 mod backend;
@@ -17,7 +20,8 @@ mod user;
 fn main() {
     let cli = get_cli();
     let matches = cli.get_matches();
-    let config = match Config::read() {
+    let backend = SystemBackend::new(Uid::from_raw(0));
+    let config = match Config::read(&backend) {
         Ok(c) => c,
         Err(e) => {
             output::error_with_details("Config error", e, false, None);
@@ -33,7 +37,7 @@ fn main() {
         force_color_output(false);
     }
 
-    let run = Run::create(&matches, &config);
+    let run = Run::create(&matches, &config, Box::new(backend));
     match run {
         Ok(mut r) => match r.do_run() {
             Ok(_) => {}

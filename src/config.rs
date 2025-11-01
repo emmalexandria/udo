@@ -66,21 +66,17 @@ pub struct Config {
 impl Config {
     pub fn read(backend: &dyn Backend) -> Result<Self> {
         let mut de: Option<Deserializer> = None;
-        let mut content: Option<String> = None;
         let path = PathBuf::from(CONFIG_PATH);
         let fd = backend.open(&path, OFlag::O_RDONLY, Mode::from_bits_truncate(0))?;
-        match fs::read_to_string(CONFIG_PATH) {
-            Ok(f) => content = Some(f),
-            Err(e) => output::error(format!("Failed to read config file ({e})"), false, None),
-        };
+        // TODO: Estimate size of a full config file
+        let mut buf: Vec<u8> = Vec::with_capacity(4096);
+        backend.read(fd, &mut buf)?;
 
-        if let Some(c) = &content {
-            match toml::Deserializer::parse(c) {
-                Ok(d) => de = Some(d),
-                Err(e) => {
-                    output::error(format!("Failed to create deserializer ({e})"), false, None)
-                }
-            }
+        let content = String::from_utf8_lossy(&buf);
+
+        match toml::Deserializer::parse(&content) {
+            Ok(d) => de = Some(d),
+            Err(e) => output::error(format!("Failed to create deserializer ({e})"), false, None),
         }
 
         if let Some(de) = de {
