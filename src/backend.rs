@@ -8,10 +8,17 @@
 pub mod system;
 #[cfg(test)]
 pub mod testing;
+#[cfg(test)]
+pub mod vfs;
 
-use std::fmt::Display;
+use std::{fmt::Display, path::Path};
 
-use nix::unistd::{Gid, Uid};
+use nix::{
+    errno::Errno,
+    fcntl::OFlag,
+    sys::stat::Mode,
+    unistd::{Gid, Uid},
+};
 
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
@@ -22,6 +29,7 @@ pub enum ErrorKind {
     DoesNotExist,
     Exec,
     Env,
+    System(Errno),
 }
 
 impl Display for ErrorKind {
@@ -34,6 +42,7 @@ impl Display for ErrorKind {
             Self::Exec => "EXEC",
             Self::Env => "ENV",
             Self::DoesNotExist => "DOES_NOT_EXIST",
+            Self::System(e) => e.desc(),
         })
     }
 }
@@ -63,7 +72,13 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait Backend {
+pub trait Syscalls {
+    type Fd;
+
+    fn open(&self, path: &Path, flags: OFlag, mode: Mode) -> Result<Self::Fd>;
+}
+
+pub trait ProcessManager {
     fn getuid(&self) -> Uid;
     /// Sets the process uid, euid, and suid
     fn setuid(&self, uid: Uid) -> Result<()>;
@@ -98,3 +113,5 @@ pub trait Backend {
     /// Return if the process is currently "effectively" root, i.e. euid == 0 || uid == 0
     fn is_root(&self) -> bool;
 }
+
+pub trait Backend: ProcessManager + Syscalls {}

@@ -1,8 +1,10 @@
-use std::{env, ffi::CString, fs};
+use std::{env, ffi::CString, fs, os::fd::OwnedFd};
 
+use nix::fcntl::{OFlag, open};
+use nix::sys::stat::Mode;
 use nix::unistd::{Gid, Uid, execvp, getuid, seteuid, setgid, setuid};
 
-use crate::backend::{Backend, Error, ErrorKind, Result};
+use crate::backend::{Error, ErrorKind, ProcessManager, Result, Syscalls};
 
 /// This is a [Backend] used for running udo. It interacts directly with the system
 /// it is running on, and all actions performed on it reflect directly on the system
@@ -21,7 +23,7 @@ impl SystemBackend {
     }
 }
 
-impl Backend for SystemBackend {
+impl ProcessManager for SystemBackend {
     fn getuid(&self) -> Uid {
         nix::unistd::getuid()
     }
@@ -111,5 +113,13 @@ impl Backend for SystemBackend {
     fn switch_final(&self) -> Result<()> {
         self.elevate()?;
         self.setuid(self.target)
+    }
+}
+
+impl Syscalls for SystemBackend {
+    type Fd = OwnedFd;
+
+    fn open(&self, path: &std::path::Path, flags: OFlag, mode: Mode) -> Result<Self::Fd> {
+        open(path, flags, mode).map_err(|e| Error::new(ErrorKind::System(e), "Could not open file"))
     }
 }

@@ -1,8 +1,12 @@
 use std::{cell::RefCell, collections::HashMap, fs};
 
-use nix::unistd::{Gid, Uid};
+use nix::{
+    fcntl::OFlag,
+    sys::stat::Mode,
+    unistd::{Gid, Uid},
+};
 
-use crate::backend::{Backend, Error, ErrorKind, Result};
+use crate::backend::{Error, ErrorKind, ProcessManager, Result, Syscalls, vfs::VirtualFS};
 
 /// This is a [Backend] used for testing udo. It in no way fully simulates a Unix system,
 /// but it aims to simulate *enough* to verify that udo has the expected behaviour
@@ -26,7 +30,7 @@ pub struct TestBackend {
     env: HashMap<String, String>,
     /// Stores an incredibly simplified representation of files (path -> content)
     /// We don't worry about permissions here, it's simply too much of a PITA.
-    files: HashMap<String, String>,
+    vfs: VirtualFS,
 }
 
 impl Default for TestBackend {
@@ -53,12 +57,12 @@ impl Default for TestBackend {
             // We default the target user to root for testing purposes
             target: root,
             env: HashMap::new(),
-            files: HashMap::new(),
+            vfs: VirtualFS::new(),
         }
     }
 }
 
-impl Backend for TestBackend {
+impl ProcessManager for TestBackend {
     fn getuid(&self) -> nix::unistd::Uid {
         *self.uid.borrow()
     }
@@ -172,11 +176,19 @@ impl Backend for TestBackend {
     }
 }
 
+impl Syscalls for TestBackend {
+    type Fd = i32;
+
+    fn open(&self, path: &std::path::Path, flags: OFlag, mode: Mode) -> Result<Self::Fd> {
+        self.vfs.open(path, flags)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use nix::unistd::Uid;
 
-    use crate::backend::{Backend, testing::TestBackend};
+    use crate::backend::{ProcessManager, testing::TestBackend};
 
     #[test]
     fn set_euid() {
