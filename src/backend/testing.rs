@@ -63,7 +63,7 @@ impl Backend for TestBackend {
         *self.uid.borrow()
     }
 
-    fn setuid(&mut self, uid: nix::unistd::Uid) -> Result<()> {
+    fn setuid(&self, uid: nix::unistd::Uid) -> Result<()> {
         // In this function we assume the executable always has the suid permissions bit for
         // testing purposes
 
@@ -86,7 +86,7 @@ impl Backend for TestBackend {
         *self.euid.borrow()
     }
 
-    fn seteuid(&mut self, uid: nix::unistd::Uid) -> Result<()> {
+    fn seteuid(&self, uid: nix::unistd::Uid) -> Result<()> {
         // Check if the saved set uid or the actual uid matches the UID attempting to be set or the
         // process is root
         if *self.suid.borrow() == uid || *self.uid.borrow() == uid || self.is_root() {
@@ -105,7 +105,7 @@ impl Backend for TestBackend {
         *self.gid.borrow()
     }
 
-    fn setgid(&mut self, gid: nix::unistd::Gid) -> Result<()> {
+    fn setgid(&self, gid: nix::unistd::Gid) -> Result<()> {
         if *self.gid.borrow() == gid || *self.sgid.borrow() == gid || self.is_root() {
             *self.gid.borrow_mut() = gid;
         } else {
@@ -120,7 +120,7 @@ impl Backend for TestBackend {
 
     // In our test backend, execvp doesn't actually have to do anything. Always returns Ok(())
     // without executing any code
-    fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()> {
+    fn execvp(&self, process: &str, args: &[&str]) -> Result<()> {
         Ok(())
     }
 
@@ -158,15 +158,15 @@ impl Backend for TestBackend {
         self.uid.borrow().is_root() || self.euid.borrow().is_root()
     }
 
-    fn elevate(&mut self) -> Result<()> {
+    fn elevate(&self) -> Result<()> {
         self.seteuid(Uid::from_raw(0))
     }
 
-    fn restore(&mut self) -> Result<()> {
+    fn restore(&self) -> Result<()> {
         self.seteuid(self.original)
     }
 
-    fn switch_final(&mut self) -> Result<()> {
+    fn switch_final(&self) -> Result<()> {
         self.elevate()?;
         self.setuid(self.target)
     }
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn set_euid() {
-        let mut backend = TestBackend::default();
+        let backend = TestBackend::default();
         // We should be able to seteuid to the uid
         backend.seteuid(backend.getuid()).unwrap();
         // And then switch back to root because its in suid
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn set_uid() {
-        let mut backend = TestBackend::default();
+        let backend = TestBackend::default();
 
         // As soon as we setuid to the uid, we should no longer have permissions to switch out our
         // uid
@@ -201,7 +201,7 @@ mod tests {
     // provides a more broad test of uid behaviour
     #[test]
     fn is_root() {
-        let mut backend = TestBackend::default();
+        let backend = TestBackend::default();
         // Store the initial value of uid for use later
         let uid = backend.getuid();
         assert!(backend.is_root());

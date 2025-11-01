@@ -105,7 +105,7 @@ impl Action {
     pub fn do_action(&self, run: &mut Run, config: &Config) -> anyhow::Result<()> {
         match self.a_type {
             ActionType::ClearCache => {
-                let ret = cache::clear_cache(&run.user, &mut run.backend);
+                let ret = cache::clear_cache(&run.user, run.backend.as_ref());
                 output::info(
                     format!("Cleared cache for user \"{}\"", run.user.name),
                     config.display.nerd,
@@ -353,9 +353,9 @@ impl<'a> Run<'a> {
     }
 
     fn after_auth(&mut self, login: Vec<Action>, root: Vec<Action>) -> anyhow::Result<()> {
-        cache::create_cache_dir(&self.user, &mut self.backend)?;
+        cache::create_cache_dir(&self.user, self.backend.as_ref())?;
         let entry: CacheEntry = self.try_into()?;
-        cache::write_entry(&self.user, entry, &mut self.backend)?;
+        cache::write_entry(&self.user, entry, self.backend.as_ref())?;
         for action in login {
             let res = action.do_action(self, self.config);
 

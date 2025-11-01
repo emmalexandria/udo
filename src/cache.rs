@@ -39,7 +39,7 @@ pub fn get_cache_dir(user: &User) -> PathBuf {
     path
 }
 
-pub fn create_cache_dir(user: &User, backend: &mut Box<dyn Backend>) -> Result<PathBuf> {
+pub fn create_cache_dir(user: &User, backend: &dyn Backend) -> Result<PathBuf> {
     let dir = get_cache_dir(user);
     backend.elevate()?;
     if fs::exists(&dir)? {
@@ -60,7 +60,7 @@ pub fn create_cache_dir(user: &User, backend: &mut Box<dyn Backend>) -> Result<P
     Ok(dir)
 }
 
-pub fn write_entry(user: &User, entry: CacheEntry, backend: &mut Box<dyn Backend>) -> Result<()> {
+pub fn write_entry(user: &User, entry: CacheEntry, backend: &dyn Backend) -> Result<()> {
     let id = get_cache_id(user)?;
     let mut path = get_cache_dir(user);
     path.push(id);
@@ -99,7 +99,7 @@ pub fn check_cache(run: &mut Run, config: &Config) -> Result<bool> {
     Ok(time_valid && user_valid)
 }
 
-pub fn clear_cache(user: &User, backend: &mut Box<dyn Backend>) -> Result<()> {
+pub fn clear_cache(user: &User, backend: &dyn Backend) -> Result<()> {
     let dir = get_cache_dir(user);
 
     backend.elevate()?;

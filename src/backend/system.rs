@@ -26,7 +26,7 @@ impl Backend for SystemBackend {
         nix::unistd::getuid()
     }
 
-    fn setuid(&mut self, uid: Uid) -> Result<()> {
+    fn setuid(&self, uid: Uid) -> Result<()> {
         setuid(uid).map_err(|e| Error::new(ErrorKind::UidSet, "Failed to set uid"))
     }
 
@@ -34,7 +34,7 @@ impl Backend for SystemBackend {
         nix::unistd::geteuid()
     }
 
-    fn seteuid(&mut self, uid: Uid) -> Result<()> {
+    fn seteuid(&self, uid: Uid) -> Result<()> {
         seteuid(uid).map_err(|e| Error::new(ErrorKind::EuidSet, "Failed to set euid"))
     }
 
@@ -42,11 +42,11 @@ impl Backend for SystemBackend {
         nix::unistd::getgid()
     }
 
-    fn setgid(&mut self, gid: Gid) -> Result<()> {
+    fn setgid(&self, gid: Gid) -> Result<()> {
         setgid(gid).map_err(|e| Error::new(ErrorKind::GidSet, "Failed to set gid"))
     }
 
-    fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()> {
+    fn execvp(&self, process: &str, args: &[&str]) -> Result<()> {
         let process = CString::new(process).map_err(|_| {
             Error::new(
                 ErrorKind::InvalidString,
@@ -100,15 +100,15 @@ impl Backend for SystemBackend {
         self.getuid().is_root() || self.geteuid().is_root()
     }
 
-    fn elevate(&mut self) -> Result<()> {
+    fn elevate(&self) -> Result<()> {
         self.seteuid(Uid::from_raw(0))
     }
 
-    fn restore(&mut self) -> Result<()> {
+    fn restore(&self) -> Result<()> {
         self.seteuid(self.original)
     }
 
-    fn switch_final(&mut self) -> Result<()> {
+    fn switch_final(&self) -> Result<()> {
         self.elevate()?;
         self.setuid(self.target)
     }
