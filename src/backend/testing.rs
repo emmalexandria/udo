@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs};
+use std::{cell::RefCell, collections::HashMap, fs};
 
 use nix::unistd::{Gid, Uid};
 
@@ -9,17 +9,17 @@ use crate::backend::{Backend, Error, ErrorKind, Result};
 #[derive(PartialEq, Eq, Clone)]
 pub struct TestBackend {
     /// Stores the group id
-    gid: Gid,
+    gid: RefCell<Gid>,
     /// Stores the effective gid,
-    egid: Gid,
+    egid: RefCell<Gid>,
     /// Stores the saved-set gid, necessary for switching egids.
-    sgid: Gid,
+    sgid: RefCell<Gid>,
     /// Stores the real uid
-    uid: Uid,
+    uid: RefCell<Uid>,
     /// Stores the effective uid
-    euid: Uid,
+    euid: RefCell<Uid>,
     /// Stores the saved-set uid, necessary for switching the euid
-    suid: Uid,
+    suid: RefCell<Uid>,
     /// Stores the original user UID, for use in elevate and restore functions
     original: Uid,
     target: Uid,
@@ -37,17 +37,17 @@ impl Default for TestBackend {
 
         Self {
             // Nice round uid of 512
-            uid: user,
+            uid: RefCell::new(user),
             // We do run with suid perms, so thats root
-            euid: root,
+            euid: RefCell::new(root),
             // And therefore so is suid
-            suid: root,
+            suid: RefCell::new(root),
             // Same for the gid
-            gid: group,
+            gid: RefCell::new(group),
             // We dont run with sgid perms, so its the same
-            egid: group,
+            egid: RefCell::new(group),
             // Therefore, so is sgid
-            sgid: group,
+            sgid: RefCell::new(group),
             // The original user is always the user running the program
             original: user,
             // We default the target user to root for testing purposes
@@ -60,15 +60,15 @@ impl Default for TestBackend {
 
 impl Backend for TestBackend {
     fn getuid(&self) -> nix::unistd::Uid {
-        self.uid
+        *self.uid.borrow()
     }
 
-    fn setuid(&mut self, uid: nix::unistd::Uid) -> Result<()> {
+    fn setuid(&self, uid: nix::unistd::Uid) -> Result<()> {
         // In this function we assume the executable always has the suid permissions bit for
         // testing purposes
 
         // If uid is not the suid, not the uid, and we aren't root, we can't setuid
-        if uid != self.suid && uid != self.uid && !self.is_root() {
+        if uid != *self.suid.borrow() && uid != *self.uid.borrow() && !self.is_root() {
             return Err(Error::new(
                 ErrorKind::UidSet,
                 "UID does not match SUID, and EUID is not root",
@@ -76,22 +76,22 @@ impl Backend for TestBackend {
         }
 
         // Setting the actual UID also sets the EUID and the SUID.
-        self.uid = uid;
-        self.euid = uid;
-        self.suid = uid;
+        *self.uid.borrow_mut() = uid;
+        *self.euid.borrow_mut() = uid;
+        *self.suid.borrow_mut() = uid;
         Ok(())
     }
 
     fn geteuid(&self) -> nix::unistd::Uid {
-        self.euid
+        *self.euid.borrow()
     }
 
-    fn seteuid(&mut self, uid: nix::unistd::Uid) -> Result<()> {
+    fn seteuid(&self, uid: nix::unistd::Uid) -> Result<()> {
         // Check if the saved set uid or the actual uid matches the UID attempting to be set or the
         // process is root
-        if self.suid == uid || self.uid == uid || self.is_root() {
-            self.suid = self.euid;
-            self.euid = uid;
+        if *self.suid.borrow() == uid || *self.uid.borrow() == uid || self.is_root() {
+            *self.suid.borrow_mut() = *self.euid.borrow();
+            *self.euid.borrow_mut() = uid;
         } else {
             return Err(Error::new(
                 ErrorKind::EuidSet,
@@ -102,12 +102,12 @@ impl Backend for TestBackend {
     }
 
     fn getgid(&self) -> nix::unistd::Gid {
-        self.gid
+        *self.gid.borrow()
     }
 
-    fn setgid(&mut self, gid: nix::unistd::Gid) -> Result<()> {
-        if self.gid == gid || self.sgid == gid || self.is_root() {
-            self.gid = gid;
+    fn setgid(&self, gid: nix::unistd::Gid) -> Result<()> {
+        if *self.gid.borrow() == gid || *self.sgid.borrow() == gid || self.is_root() {
+            *self.gid.borrow_mut() = gid;
         } else {
             return Err(Error::new(
                 ErrorKind::GidSet,
@@ -120,7 +120,7 @@ impl Backend for TestBackend {
 
     // In our test backend, execvp doesn't actually have to do anything. Always returns Ok(())
     // without executing any code
-    fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()> {
+    fn execvp(&self, process: &str, args: &[&str]) -> Result<()> {
         Ok(())
     }
 
@@ -155,18 +155,18 @@ impl Backend for TestBackend {
     }
 
     fn is_root(&self) -> bool {
-        self.uid.is_root() || self.euid.is_root()
+        self.uid.borrow().is_root() || self.euid.borrow().is_root()
     }
 
-    fn elevate(&mut self) -> Result<()> {
+    fn elevate(&self) -> Result<()> {
         self.seteuid(Uid::from_raw(0))
     }
 
-    fn restore(&mut self) -> Result<()> {
+    fn restore(&self) -> Result<()> {
         self.seteuid(self.original)
     }
 
-    fn switch_final(&mut self) -> Result<()> {
+    fn switch_final(&self) -> Result<()> {
         self.elevate()?;
         self.setuid(self.target)
     }
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn set_euid() {
-        let mut backend = TestBackend::default();
+        let backend = TestBackend::default();
         // We should be able to seteuid to the uid
         backend.seteuid(backend.getuid()).unwrap();
         // And then switch back to root because its in suid
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn set_uid() {
-        let mut backend = TestBackend::default();
+        let backend = TestBackend::default();
 
         // As soon as we setuid to the uid, we should no longer have permissions to switch out our
         // uid
@@ -201,7 +201,7 @@ mod tests {
     // provides a more broad test of uid behaviour
     #[test]
     fn is_root() {
-        let mut backend = TestBackend::default();
+        let backend = TestBackend::default();
         // Store the initial value of uid for use later
         let uid = backend.getuid();
         assert!(backend.is_root());

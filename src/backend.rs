@@ -66,16 +66,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub trait Backend {
     fn getuid(&self) -> Uid;
     /// Sets the process uid, euid, and suid
-    fn setuid(&mut self, uid: Uid) -> Result<()>;
+    fn setuid(&self, uid: Uid) -> Result<()>;
 
     fn geteuid(&self) -> Uid;
     /// Sets the process euid, inline with Unix permissions
-    fn seteuid(&mut self, uid: Uid) -> Result<()>;
+    fn seteuid(&self, uid: Uid) -> Result<()>;
 
     fn getgid(&self) -> Gid;
-    fn setgid(&mut self, uid: Gid) -> Result<()>;
+    fn setgid(&self, uid: Gid) -> Result<()>;
 
-    fn execvp(&mut self, process: &str, args: &[&str]) -> Result<()>;
+    fn execvp(&self, process: &str, args: &[&str]) -> Result<()>;
 
     /// Get an environment variable
     fn get_var(&self, name: &str) -> Result<String>;
@@ -87,13 +87,13 @@ pub trait Backend {
     fn vars(&self) -> Vec<(String, String)>;
 
     /// Elevate to root for privileged operations
-    fn elevate(&mut self) -> Result<()>;
+    fn elevate(&self) -> Result<()>;
 
     /// Restore to the original user
-    fn restore(&mut self) -> Result<()>;
+    fn restore(&self) -> Result<()>;
 
     /// Make the final switch (setuid) to the target user
-    fn switch_final(&mut self) -> Result<()>;
+    fn switch_final(&self) -> Result<()>;
 
     /// Return if the process is currently "effectively" root, i.e. euid == 0 || uid == 0
     fn is_root(&self) -> bool;

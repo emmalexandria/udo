@@ -14,7 +14,6 @@ use nix::{
     unistd::{User, getppid, ttyname},
 };
 use serde::{Deserialize, Serialize};
-use toml::Deserializer;
 
 use crate::{backend::Backend, config::Config, run::Run};
 
@@ -23,102 +22,96 @@ pub struct Cache {
     dir: PathBuf,
 }
 
-impl Cache {
-    pub fn new(user: &User) -> Self {
-        let dir = Self::get_dir(user);
-        Self { dir }
-    }
+pub fn get_cache_id(user: &User) -> Result<String> {
+    let uid = user.uid;
+    let stdin = stdin();
+    let stdin_fd = stdin.as_fd();
+    let tty_path = ttyname(stdin_fd)?;
+    let tty = tty_path.file_name().unwrap_or_default().to_string_lossy();
+    let pid = getppid();
 
-    pub fn get_id(user: &User) -> Result<String> {
-        let uid = user.uid;
-        let stdin = stdin();
-        let stdin_fd = stdin.as_fd();
-        let tty_path = ttyname(stdin_fd)?;
-        let tty = tty_path.file_name().unwrap_or_default().to_string_lossy();
-        let pid = getppid();
+    Ok(format!("{uid}-{tty}-{pid}"))
+}
 
-        Ok(format!("{uid}-{tty}-{pid}"))
-    }
+pub fn get_cache_dir(user: &User) -> PathBuf {
+    let mut path = PathBuf::from(CACHE_DIR);
+    path.push(&user.name);
+    path
+}
 
-    pub fn get_dir(user: &User) -> PathBuf {
-        let mut path = PathBuf::from(CACHE_DIR);
-        path.push(&user.name);
-        path
-    }
-
-    pub fn create_dir(&mut self, backend: &mut Box<dyn Backend>) -> Result<PathBuf> {
-        backend.elevate()?;
-        if fs::exists(&self.dir)? {
-            let md = fs::metadata(&self.dir)?;
-            if md.is_dir() {
-                return Ok(self.dir.clone());
-            }
+pub fn create_cache_dir(user: &User, backend: &dyn Backend) -> Result<PathBuf> {
+    let dir = get_cache_dir(user);
+    backend.elevate()?;
+    if fs::exists(&dir)? {
+        let md = fs::metadata(&dir)?;
+        if md.is_dir() {
+            return Ok(dir);
         }
-
-        fs::create_dir_all(&self.dir)?;
-        fs::set_permissions(&self.dir, Permissions::from_mode(0o700))?;
-        fs::set_permissions(&self.dir, Permissions::from_mode(0o700))?;
-        backend.restore()?;
-
-        Ok(self.dir.clone())
     }
 
-    pub fn cache_run(&self, run: &mut Run) -> Result<()> {
-        let id = Self::get_id(&run.user)?;
-        let mut f_path = self.dir.clone();
-        f_path.push(id);
+    fs::create_dir_all(&dir)?;
+    let parent_default = PathBuf::from(CACHE_DIR);
+    let parent = dir.parent().unwrap_or(&parent_default);
+    fs::set_permissions(parent, Permissions::from_mode(0o700))?;
+    fs::set_permissions(&dir, Permissions::from_mode(0o700))?;
 
-        let entry = CacheEntry::try_from(&mut *run)?;
+    backend.restore()?;
 
-        let mut buf = toml::ser::Buffer::new();
-        let se = toml::Serializer::new(&mut buf);
-        let out = entry.serialize(se)?;
+    Ok(dir)
+}
 
-        run.backend.elevate()?;
-        let mut file = File::create(f_path)?;
-        file.write_all(out.to_string().as_bytes())?;
-        run.backend.restore()?;
+pub fn write_entry(user: &User, entry: CacheEntry, backend: &dyn Backend) -> Result<()> {
+    let id = get_cache_id(user)?;
+    let mut path = get_cache_dir(user);
+    path.push(id);
 
-        Ok(())
+    let mut buf = toml::ser::Buffer::new();
+    let se = toml::Serializer::new(&mut buf);
+    let out = entry.serialize(se)?;
+
+    backend.elevate()?;
+    let mut file = File::create(path)?;
+    file.write_all(out.to_string().as_bytes())?;
+    backend.restore()?;
+
+    Ok(())
+}
+
+pub fn check_cache(run: &mut Run, config: &Config) -> Result<bool> {
+    let id = get_cache_id(&run.user)?;
+    let mut full = get_cache_dir(&run.user);
+    full.push(id);
+
+    let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
+
+    run.backend.elevate()?;
+    if !full.exists() || full.is_dir() {
+        return Ok(false);
     }
 
-    pub fn check_cache(&self, run: &mut Run, config: &Config) -> Result<bool> {
-        let id = Self::get_id(&run.user)?;
-        let mut full = self.dir.clone();
-        full.push(id);
+    let content = fs::read_to_string(full)?;
+    let entry = CacheEntry::from_content(&content)?;
+    run.backend.restore()?;
 
-        let time = clock_gettime(ClockId::CLOCK_REALTIME)?;
+    let time_valid = time.num_minutes() - entry.timestamp < config.security.timeout;
+    let user_valid = entry.uid == run.do_as.uid.as_raw();
 
-        run.backend.elevate()?;
-        if !full.exists() || full.is_dir() {
-            return Ok(false);
-        }
+    Ok(time_valid && user_valid)
+}
 
-        let content = fs::read_to_string(full)?;
-        let de = Deserializer::parse(&content)?;
-        let entry = CacheEntry::deserialize(de)?;
-        run.backend.restore()?;
+pub fn clear_cache(user: &User, backend: &dyn Backend) -> Result<()> {
+    let dir = get_cache_dir(user);
 
-        let time_valid = time.num_minutes() - entry.timestamp < config.security.timeout;
-        let user_valid = entry.uid == run.do_as.uid.as_raw();
-
-        Ok(time_valid && user_valid)
+    backend.elevate()?;
+    if dir.exists() && dir.is_dir() {
+        fs::remove_dir_all(&dir)?;
     }
-
-    pub fn clear(&self, backend: &mut Box<dyn Backend>) -> Result<()> {
-        backend.elevate()?;
-
-        if self.dir.exists() && self.dir.is_dir() {
-            fs::remove_dir_all(&self.dir)?;
-        }
-
-        backend.restore()?;
-        Ok(())
-    }
+    backend.restore()?;
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct CacheEntry {
+pub struct CacheEntry {
     timestamp: i64,
     uid: u32,
 }
@@ -126,6 +119,11 @@ struct CacheEntry {
 impl CacheEntry {
     pub fn new(timestamp: i64, uid: u32) -> Self {
         Self { timestamp, uid }
+    }
+
+    pub fn from_content(content: &str) -> Result<Self> {
+        let de = toml::Deserializer::parse(content)?;
+        Ok(Self::deserialize(de)?)
     }
 }
 
